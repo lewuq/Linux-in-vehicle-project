@@ -49,6 +49,14 @@ Monitor::Monitor(QWidget *parent) :
     font.setBold(true);
     showDistance->setFont(font);
     showDistance->setText("距离:xxxx");
+
+    fpsLabel = new QLabel(this);
+    fpsLabel->setAlignment(Qt::AlignCenter);
+    fpsLabel->setStyleSheet("QLabel{color:white;}"
+                            "QLabel{background:argb(255,0,0,120);}"
+                            "QLabel{border-radius:8px;}");
+    fpsLabel->setFont(font);
+    fpsLabel->setText("FPS: 0.0");
     /* 按钮 */
     startCaptureButton = new QPushButton(this);
     startCaptureButton->setCheckable(true);
@@ -84,6 +92,20 @@ Monitor::~Monitor()
 void Monitor::showImage(QImage image)
 {
     videoLabel->setPixmap(QPixmap::fromImage(image));
+
+    if (!fpsTimer.isValid()) {
+        fpsTimer.start();
+        fpsFrameCount = 0;
+    }
+
+    ++fpsFrameCount;
+    const qint64 elapsedMs = fpsTimer.elapsed();
+    if (elapsedMs >= 1000) {
+        currentFps = (fpsFrameCount * 1000.0) / elapsedMs;
+        fpsLabel->setText(QString("FPS: %1").arg(currentFps, 0, 'f', 1));
+        fpsFrameCount = 0;
+        fpsTimer.restart();
+    }
 }
 
 void Monitor::resizeEvent(QResizeEvent *event)
@@ -93,6 +115,8 @@ void Monitor::resizeEvent(QResizeEvent *event)
     startCaptureButton->resize(200, 40);
     showDistance->resize(200,60);
     showDistance->move((this->width() - 200) / 2, this->height() - 140);
+    fpsLabel->resize(140, 42);
+    fpsLabel->move(this->width() - fpsLabel->width() - 16, 16);
    // videoLabel->move((this->width() - 640) / 2, (this->height() - 480) / 2);
 //    checkBox1->move(this->width() - 120, this->height() / 2 - 50);
     //    checkBox2->move(this->width() - 120, this->height() / 2 + 25);
@@ -101,13 +125,17 @@ void Monitor::resizeEvent(QResizeEvent *event)
 void Monitor::myStart()
 {
     DisUpdate_Timer->start();
+    fpsFrameCount = 0;
+    currentFps = 0.0;
+    fpsLabel->setText("FPS: 0.0");
+    fpsTimer.invalidate();
     captureThread->startThread();
 }
 
 void Monitor::myStop()
 {
     DisUpdate_Timer->stop();
-
+    fpsTimer.invalidate();
     captureThread->stopThread();
 }
 
@@ -130,9 +158,14 @@ void Monitor::on_handleCommand(int command)
     switch (command) {
     case MONITOR_COMMAND_SHOW:
         this->show();
+        this->raise();
+        this->activateWindow();
+        myStart();
         break;
     case MONITOR_COMMAND_CLOSE:
+        myStop();
         this->hide();
+        break;
     default:
         break;
     }

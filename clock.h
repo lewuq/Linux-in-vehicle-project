@@ -23,6 +23,7 @@ public:
 private:
     Ui::Clock *ui;
     QTime time;
+    QTimer *timer;
     // QWidget interface
 protected:
     void paintEvent(QPaintEvent *event);

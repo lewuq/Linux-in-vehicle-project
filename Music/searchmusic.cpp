@@ -7,15 +7,25 @@ SearchMusic::SearchMusic(QWidget *parent)
 {
     ui->setupUi(this);
     NetAccessManager = new QNetworkAccessManager(this);
+    SongNetworkManager = new QNetworkAccessManager(this);
 
     //在网络请求成功之后会自动调用onReplied函数，对返回的数据包解析
     connect(NetAccessManager,&QNetworkAccessManager::finished,
             this,&SearchMusic::onReplied);
     this->setLocale(QLocale::Chinese);
+
+    // 补充返回按钮，避免用户只能通过系统方式关闭页面。
+    QPushButton *backBtn = new QPushButton(QString::fromUtf8("返回"), this);
+    backBtn->setMinimumSize(80, 44);
+    backBtn->setStyleSheet("QPushButton{background:#eef2f6;border:1px solid #cfd8e3;border-radius:10px;font-size:16px;color:#1f2a37;}");
+    ui->horizontalLayout->addWidget(backBtn);
+    connect(backBtn, SIGNAL(clicked()), this, SLOT(on_pBtn_Back_clicked()));
 }
 
 SearchMusic::~SearchMusic()
 {
+    qDeleteAll(songsVector);
+    songsVector.clear();
     delete ui;
 }
 
@@ -107,8 +117,13 @@ void SearchMusic::fromNetJson(QByteArray &byteArr)
     QJsonObject obj = doc.object();
     QJsonObject val = obj.value("result").toObject();
     QJsonArray songs = val.value("songs").toArray();
+
+    qDeleteAll(songsVector);
+    songsVector.clear();
     ui->listWidget->clear();
-    for (int i=0; i<searchNum; i++) {
+
+    const int count = qMin(searchNum, songs.size());
+    for (int i=0; i<count; i++) {
         QJsonObject singleSong = songs.at(i).toObject();
         song = new Song();
         song->setAlbumName(singleSong.value("album").toObject().value("name").toString());
@@ -118,6 +133,10 @@ void SearchMusic::fromNetJson(QByteArray &byteArr)
         song->setSongName(singleSong.value("name").toString());
         songsVector.append(song);
         ui->listWidget->addItem(song->getSongName()+QString("_")+song->getSingerName()+QString("_")+song->getAlbumName());
+    }
+
+    if (count == 0) {
+        ui->listWidget->addItem(QString::fromUtf8("未找到结果，请换关键字"));
     }
     qDebug()<<"*****************************/n";
 
@@ -216,7 +235,17 @@ const QString &Song::getSongDownloadUrl() const
 void SearchMusic::on_pushButton_clicked()
 {
     int index = ui->listWidget->currentRow();
-    emit AddUrlMusic(ui->listWidget->currentItem()->text(),this->songsVector.at(index)->getSongDownloadUrl());
+    if (index < 0 || index >= songsVector.size() || ui->listWidget->currentItem() == nullptr) {
+        QMessageBox::information(this, QString::fromUtf8("提示"), QString::fromUtf8("请先选择一首歌曲再添加"));
+        return;
+    }
+
+    emit AddUrlMusic(ui->listWidget->currentItem()->text(), this->songsVector.at(index)->getSongDownloadUrl());
+    this->hide();
+}
+
+void SearchMusic::on_pBtn_Back_clicked()
+{
     this->hide();
 }
 

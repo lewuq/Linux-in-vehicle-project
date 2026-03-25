@@ -32,7 +32,7 @@ void BaiduMap::updateMap()
     }
     else
     {
-        center = "沈阳";
+        center = "惠州";
     }
     QString url = MapImgUrl.arg(center).arg(img_Zoom);
     qDebug()<<url;

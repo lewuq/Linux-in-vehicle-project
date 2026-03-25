@@ -7,12 +7,70 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <linux/ioctl.h>
+#include <QDateTime>
+
+static QString firstNonEmptyString(const QList<QVariant> &values)
+{
+    for (int i = 0; i < values.size(); ++i) {
+        const QString v = values.at(i).toString().trimmed();
+        if (!v.isEmpty()) {
+            return v;
+        }
+    }
+    return QString();
+}
+
+static QString choosePreferredContainer(const QList<QVariant> &values)
+{
+    const QStringList preferred = QStringList()
+            << "audio/x-wav"
+            << "audio/wav"
+            << "wav"
+            << "audio/x-pcm"
+            << "audio/pcm";
+
+    for (int i = 0; i < preferred.size(); ++i) {
+        const QString want = preferred.at(i);
+        for (int j = 0; j < values.size(); ++j) {
+            const QString got = values.at(j).toString().trimmed();
+            if (!got.isEmpty() && got.compare(want, Qt::CaseInsensitive) == 0) {
+                return got;
+            }
+        }
+    }
+
+    return firstNonEmptyString(values);
+}
+
+static QString choosePreferredCodec(const QList<QVariant> &values)
+{
+    const QStringList preferred = QStringList()
+            << "audio/pcm"
+            << "pcm"
+            << "audio/x-raw"
+            << "audio/amr";
+
+    for (int i = 0; i < preferred.size(); ++i) {
+        const QString want = preferred.at(i);
+        for (int j = 0; j < values.size(); ++j) {
+            const QString got = values.at(j).toString().trimmed();
+            if (!got.isEmpty() && got.compare(want, Qt::CaseInsensitive) == 0) {
+                return got;
+            }
+        }
+    }
+
+    return firstNonEmptyString(values);
+}
+
 SpeechRecognition::SpeechRecognition()
 {
     timer = new QTimer();
     initAudioRecord();
     initKeyRead();
     connect(timer,SIGNAL(timeout()),this,SLOT(timer_timerout()));
+        connect(m_audioRecorder, SIGNAL(stateChanged(QMediaRecorder::State)),
+            this, SLOT(onRecorderStateChanged(QMediaRecorder::State)));
 }
 
 void SpeechRecognition::initAudioRecord()
@@ -80,18 +138,29 @@ void SpeechRecognition::initKeyRead()
 void SpeechRecognition::startRecord()
 {
     qDebug()<<"start record";
-    m_audioRecorder->setAudioInput(devicesVar.at(0).toString());
+    pendingRecordFinished = false;
+    recordStartMs = QDateTime::currentMSecsSinceEpoch();
+
+    const QString inputDevice = firstNonEmptyString(devicesVar);
+    if (!inputDevice.isEmpty()) {
+        m_audioRecorder->setAudioInput(inputDevice);
+    }
+
     QAudioEncoderSettings settings;
-    settings.setCodec(codecsVar.at(0).toString());
-    settings.setSampleRate(sampleRateVar[2].toInt());
-    settings.setBitRate(bitratesVar[0].toInt());
-    settings.setChannelCount(channelsVar[1].toInt());
-    settings.setQuality(QMultimedia::EncodingQuality(
-        qualityVar[0].toInt()));
+    settings.setSampleRate(16000);
+    settings.setChannelCount(1);
+    settings.setQuality(QMultimedia::NormalQuality);
     /* 以恒定的质量录制，可选恒定的比特率 */
     settings.setEncodingMode(QMultimedia::ConstantQualityEncoding);
-    QString container = containersVar.at(20).toString();
-    m_audioRecorder->setEncodingSettings(settings,QVideoEncoderSettings(),container);
+
+    const QString codec = choosePreferredCodec(codecsVar);
+    const QString container = choosePreferredContainer(containersVar);
+    if (!codec.isEmpty()) {
+        settings.setCodec(codec);
+    }
+
+    QFile::remove("./record.wav");
+    m_audioRecorder->setEncodingSettings(settings, QVideoEncoderSettings(), container);
     m_audioRecorder->setOutputLocation(QUrl::fromLocalFile(tr("./record.wav")));
     m_audioRecorder->record();
 }
@@ -100,8 +169,15 @@ void SpeechRecognition::startRecord()
 /*  录音停止 并发送信号，调用对应槽函数处理  */
 void SpeechRecognition::stopRecord()
 {
-    m_audioRecorder->stop();
-    emit RecordFinished();
+    if (!m_audioRecorder) {
+        return;
+    }
+
+    if (m_audioRecorder->status() == QMediaRecorder::RecordingStatus
+            || m_audioRecorder->status() == QMediaRecorder::PausedStatus) {
+        pendingRecordFinished = true;
+        m_audioRecorder->stop();
+    }
 }
 
 /* 获取按键值，如果是按下 按键值为240，否则为0  */
@@ -124,8 +200,21 @@ void SpeechRecognition::timer_timerout()
     }
     else
     {
-        if(hasRecord==1)stopRecord();
+        if(hasRecord==1) {
+            const qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - recordStartMs;
+            if (elapsed >= 700) {
+                stopRecord();
+            }
+        }
         hasRecord = 0;
+    }
+}
+
+void SpeechRecognition::onRecorderStateChanged(QMediaRecorder::State state)
+{
+    if (state == QMediaRecorder::StoppedState && pendingRecordFinished) {
+        pendingRecordFinished = false;
+        emit RecordFinished();
     }
 }
 

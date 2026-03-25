@@ -8,6 +8,7 @@
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QTimer>
+#include <QElapsedTimer>
 
 #include "capture_thread.h"
 #include "ap3216.h"
@@ -48,6 +49,10 @@ private:
     /* 用于开启网络广播 */
     QCheckBox *checkBox2;
     QLabel *showDistance;
+    QLabel *fpsLabel;
+    QElapsedTimer fpsTimer;
+    int fpsFrameCount = 0;
+    double currentFps = 0.0;
 
     /*      Ap3216c   */
     Ap3216c *ap3216;

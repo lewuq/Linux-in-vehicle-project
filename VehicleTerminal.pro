@@ -64,4 +64,6 @@ RESOURCES += \
 
 DISTFILES += \
     Monitor/ap3216 \
-    Music/style.qss
+    Music/style.qss \
+    Weather/weather_dark_style.qss \
+    EMBEDDED_GUIDELINES.md

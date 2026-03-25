@@ -1,0 +1,21 @@
+# Qt/qmake build artifacts
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+
+# Qt generated source/header files
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+
+# qmake generated files
+Makefile
+*.pro.user*
+
+# Build directories
+build/
+debug/
+release/

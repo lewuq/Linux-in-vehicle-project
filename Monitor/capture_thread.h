@@ -36,7 +36,7 @@ Copyright © Deng Zhimao Co., Ltd. 2021-2030. All rights reserved.
 #include <QUdpSocket>
 #include <atomic>
 
-#define VIDEO_DEV			"/dev/video0"
+#define VIDEO_DEV			"/dev/video1"
 #define FB_DEV				"/dev/fb0"
 #define VIDEO_BUFFER_COUNT	3
 

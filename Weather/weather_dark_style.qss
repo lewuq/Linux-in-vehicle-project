@@ -1,0 +1,204 @@
+/* ========================================
+   车载天气模块 - 深色模式 + 卡片式布局QSS
+   遵循全局视觉规范
+   ======================================== */
+
+/* 主窗口与全局背景 */
+QMainWindow {
+    background-color: #000000;
+    margin: 0px;
+    padding: 0px;
+}
+
+QWidget {
+    background-color: transparent;
+}
+
+/* ===== 卡片容器样式 ===== */
+/* 今日实时卡片 */
+QWidget#widget_Now,
+QWidget#widget_Container_Now {
+    background-color: #22c069;
+    border-radius: 20px;
+    border: none;
+    padding: 20px;
+}
+
+/* 未来预测卡片 */
+QWidget#widget_Forecast,
+QWidget#widget_Container_Forecast {
+    background-color: #1C1C1E;
+    border-radius: 20px;
+    border: none;
+    padding: 15px;
+}
+
+QGroupBox {
+    background-color: #1C1C1E;
+    border-radius: 20px;
+    border: 1px solid #333333;
+    margin-top: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 15px;
+    padding: 0 3px 0 3px;
+}
+
+/* ===== 文字样式规范 ===== */
+/* 全局标签默认样式 */
+QLabel {
+    background-color: transparent;
+    color: #FFFFFF;
+    font-family: "Microsoft YaHei", Roboto, "思源黑体";
+}
+
+/* 更新时间标签 */
+QLabel#label_Time {
+    font-size: 12px;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+/* 城市标签 */
+QLabel#label_location {
+    font-size: 16px;
+    color: #FFFFFF;
+    font-weight: bold;
+}
+
+/* 当前温度 - 超大数字 */
+QLabel#label_now_tmp {
+    font-size: 72px;
+    color: #FFFFFF;
+    font-weight: bold;
+    font-family: Roboto, "Arial";
+}
+
+/* 当前天气描述 */
+QLabel#label_now_des {
+    font-size: 16px;
+    color: #FFFFFF;
+    font-weight: 500;
+}
+
+/* 当前风力信息 */
+QLabel#label_now_win,
+QLabel#label_now_winSpeed {
+    font-size: 13px;
+    color: #8E8E93;
+}
+
+/* 未来四天的日期与周几 */
+QLabel#label_day1_data,
+QLabel#label_day2_data,
+QLabel#label_day3_data,
+QLabel#label_day4_data,
+QLabel#label_day1_week,
+QLabel#label_day2_week,
+QLabel#label_day3_week,
+QLabel#label_day4_week {
+    font-size: 12px;
+    color: #8E8E93;
+}
+
+/* 未来四天的天气描述 */
+QLabel#label_day1_des,
+QLabel#label_day2_des,
+QLabel#label_day3_des,
+QLabel#label_day4_des {
+    font-size: 14px;
+    color: #FFFFFF;
+}
+
+/* 未来四天的温度 */
+QLabel#label_day1_tmp,
+QLabel#label_day2_tmp,
+QLabel#label_day3_tmp,
+QLabel#label_day4_tmp {
+    font-size: 12px;
+    color: #FF9500;
+    font-weight: bold;
+}
+
+/* 未来四天的风力信息 */
+QLabel#label_day1_win,
+QLabel#label_day2_win,
+QLabel#label_day3_win,
+QLabel#label_day4_win,
+QLabel#label_day1_winSpeed,
+QLabel#label_day2_winSpeed,
+QLabel#label_day3_winSpeed,
+QLabel#label_day4_winSpeed {
+    font-size: 11px;
+    color: #8E8E93;
+}
+
+/* 图片标签 - 透明背景 */
+QLabel#label_now_img,
+QLabel#label_day1_img,
+QLabel#label_day2_img,
+QLabel#label_day3_img,
+QLabel#label_day4_img {
+    background-color: transparent;
+    border: none;
+}
+
+/* ===== 按钮样式 ===== */
+QPushButton {
+    background-color: #2C2C2E;
+    color: #FFFFFF;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid #333333;
+    font-family: "Microsoft YaHei", Roboto;
+}
+
+QPushButton:hover {
+    background-color: #3A3A3E;
+    border: 1px solid #555555;
+}
+
+QPushButton:pressed {
+    background-color: #1C1C1E;
+    border: 1px solid #444444;
+}
+
+/* ===== 分割线与边框 ===== */
+QSplitter::handle {
+    background-color: #333333;
+}
+
+QSplitter::handle:hover {
+    background-color: #555555;
+}
+
+/* ===== 滚动条样式（如果后续需要） ===== */
+QScrollBar:vertical {
+    background-color: #1C1C1E;
+    width: 12px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #555555;
+    border-radius: 6px;
+    min-height: 20px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #777777;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+}

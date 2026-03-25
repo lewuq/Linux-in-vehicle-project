@@ -4,6 +4,8 @@
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QParallelAnimationGroup>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include "settingwindow.h"
 #include "clock.h"
 #include "dht11.h"
@@ -14,6 +16,7 @@
 #include "speechrecognition.h"
 #include "onevideo.h"
 #include <QTimer>
+#include <QPushButton>
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -35,6 +38,8 @@ private slots:
     void getSpeechResult(QNetworkReply *reply);
 
     void on_pBtn_Music_clicked();
+    void on_pBtn_Video_clicked();
+    void on_timeSyncReply(QNetworkReply *reply);
 
     void on_pBtn_Weather_clicked();
 
@@ -42,6 +47,8 @@ private slots:
 
     void on_pBtn_Map_clicked();
     void on_timer_updateTime();
+    void on_quickSetTime_clicked();
+    void on_networkTimeSync_clicked();
 
     void on_handleRecord();
 
@@ -62,8 +69,13 @@ private:
     QTimer *time;
     SpeechRecognition *AsrThread;
     QNetworkAccessManager *networkManage;
+    QNetworkAccessManager *timeSyncManager = nullptr;
     QNetworkRequest *request;
     QVector<QMainWindow *> windows;
+    QPushButton *quickSetTimeBtn = nullptr;
+    QPushButton *networkSyncBtn = nullptr;
+
+    void syncBeijingTime();
 
 };
 #endif // MAINWINDOW_H

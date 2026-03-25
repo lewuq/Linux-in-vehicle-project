@@ -1,0 +1,134 @@
+/* Xiaomi-like light cockpit weather theme (resource embedded, low-cost rendering) */
+
+QMainWindow {
+    background-color: #8FC31F;
+    margin: 0px;
+    padding: 0px;
+}
+
+QWidget {
+    background-color: #8FC31F;
+    color: #1D4152;
+    font-family: "Microsoft YaHei", Roboto, "Source Han Sans CN", sans-serif;
+}
+
+QGroupBox {
+    background-color: #FFFFFF;
+    border: 1px solid rgba(0, 6, 8, 0.24);
+    border-radius: 20px;
+    margin-top: 8px;
+    padding: 12px;
+}
+
+QGroupBox#groupBox_Total {
+    background-color: rgba(2, 20, 27, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+}
+
+QGroupBox#groupBox_5 {
+    background-color: #FFFFFF;
+    border: 2px solid rgba(1, 15, 20, 0.34);
+}
+
+QGroupBox#groupBox_4,
+QGroupBox#groupBox_3,
+QGroupBox#groupBox_2,
+QGroupBox#groupBox {
+    background-color: #F6FBF8;
+    border: 1px solid rgba(0, 1, 2, 0.24);
+}
+
+QLabel {
+    background-color: transparent;
+    color: #031118;
+}
+
+QLabel#label,
+QLabel#label_37 {
+    color: #000000;
+    font-weight: 600;
+    background-color: #FFFFFF;
+    border: 1px solid rgba(0, 0, 0, 0.20);
+    border-radius: 8px;
+    padding: 3px 6px;
+}
+
+QLabel#label_Time,
+QLabel#label_location {
+    background-color: transparent;
+    border: none;
+    border-radius: 0px;
+    padding: 0px;
+}
+
+QLabel#label_Time,
+QLabel#label_day1_data,
+QLabel#label_day2_data,
+QLabel#label_day3_data,
+QLabel#label_day4_data,
+QLabel#label_day1_week,
+QLabel#label_day2_week,
+QLabel#label_day3_week,
+QLabel#label_day4_week,
+QLabel#label_day1_win,
+QLabel#label_day2_win,
+QLabel#label_day3_win,
+QLabel#label_day4_win,
+QLabel#label_day1_winSpeed,
+QLabel#label_day2_winSpeed,
+QLabel#label_day3_winSpeed,
+QLabel#label_day4_winSpeed,
+QLabel#label_now_win,
+QLabel#label_now_winSpeed {
+    color: #420977;
+    font-size: 12px;
+}
+
+QLabel#label_now_des,
+QLabel#label_day1_des,
+QLabel#label_day2_des,
+QLabel#label_day3_des,
+QLabel#label_day4_des {
+    color: #001722;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+QLabel#label_now_tmp {
+    color: #13181b;
+    font-size: 72px;
+    font-weight: 700;
+}
+
+QLabel#label_day1_tmp,
+QLabel#label_day2_tmp,
+QLabel#label_day3_tmp,
+QLabel#label_day4_tmp {
+    color: #111618;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+QLabel#label_now_des {
+    color: #1c2225;
+    font-weight: 700;
+}
+
+QPushButton {
+    min-height: 48px;
+    background-color: #FFFFFF;
+    color: #191e20;
+    border: 1px solid rgba(1, 9, 12, 0.3);
+    border-radius: 14px;
+    padding: 10px 16px;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QPushButton:pressed {
+    background-color: #EDF5F7;
+}
+
+QLine {
+    background-color: rgba(0, 73, 102, 0.16);
+}

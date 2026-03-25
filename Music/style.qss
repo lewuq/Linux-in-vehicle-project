@@ -1,82 +1,188 @@
-QPushButton#pBtn_Pre
-{
+/* NetEase-inspired player on Xiaomi-like white cockpit background.
+   Keep styles lightweight for IMX6ULL: solid colors, simple borders, no heavy shadows. */
+
+QMainWindow#MusicPlayer {
+    background-color: #eef2f6;
+}
+
+QWidget#centralwidget {
+    background-color: #eef2f6;
+}
+
+QLabel {
+    color: #1f2a37;
+    background: transparent;
+    font-family: "Microsoft YaHei", Roboto, "Source Han Sans CN";
+}
+
+QLabel#label {
+    color: #d33a31;
+    font-size: 22px;
+    font-weight: 700;
+    padding: 6px 10px;
+    background-color: #ffffff;
+    border: 1px solid #dbe2ea;
+    border-radius: 12px;
+}
+
+QListWidget#listWidget {
+    background-color: #ffffff;
+    color: #1f2a37;
+    border: 1px solid #dbe2ea;
+    border-radius: 16px;
+    outline: none;
+    padding: 6px;
+    font-size: 17px;
+}
+
+QListWidget#listWidget::item {
+    min-height: 42px;
+    border-radius: 10px;
+    padding: 4px 10px;
+}
+
+QListWidget#listWidget::item:selected {
+    background-color: #fceceb;
+    color: #d33a31;
+    border: 1px solid #f3cecb;
+}
+
+QLabel#label_pic {
+    background-color: #ffffff;
+    border: 1px solid #dbe2ea;
+    border-radius: 20px;
+    padding: 10px;
+    border-image: url(:/music/Music/images/cd.png);
+}
+
+QLabel#label_CurTime,
+QLabel#label_TotalTime {
+    color: #6a7786;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QSlider#horizontalSlider {
+    min-height: 24px;
+}
+
+QSlider#horizontalSlider::groove:horizontal {
+    height: 6px;
+    background: #d9e0e7;
+    border-radius: 3px;
+}
+
+QSlider#horizontalSlider::sub-page:horizontal {
+    background: #d33a31;
+    border-radius: 3px;
+}
+
+QSlider#horizontalSlider::handle:horizontal {
+    width: 18px;
+    margin: -6px 0;
+    background: #ffffff;
+    border: 2px solid #d33a31;
+    border-radius: 9px;
+}
+
+QPushButton {
+    min-width: 48px;
+    min-height: 48px;
+    background-color: #ffffff;
+    border: 1px solid #dbe2ea;
+    border-radius: 14px;
+}
+
+QPushButton:hover {
+    background-color: #f7f9fb;
+}
+
+QPushButton#pushButton {
+    border-radius: 18px;
+    border: 1px solid #f0c8c5;
+    background-color: #fdeceb;
+}
+
+QPushButton#pBtn_Pre,
+QPushButton#pBtn_Next,
+QPushButton#pBtn_Pause,
+QPushButton#pBtn_OpenSearchWin {
+    min-width: 92px;
+    min-height: 92px;
+    max-width: 100px;
+    max-height: 100px;
+}
+
+QPushButton#pBtn_Pre {
     border-image:url(:/music/Music/images/btn_previous1.png);
 }
-QPushButton#pBtn_Pre:hover
-{
+
+QPushButton#pBtn_Pre:hover {
     border-image:url(:/music/Music/images/btn_previous2.png);
 }
 
-QPushButton#pBtn_Next
-{
+QPushButton#pBtn_Next {
     border-image:url(:/music/Music/images/btn_next1.png);
 }
-QPushButton#pBtn_Next:hover
-{
+
+QPushButton#pBtn_Next:hover {
     border-image:url(:/music/Music/images/btn_next2.png);
 }
-QPushButton#pBtn_Pause::checked
-{
+
+QPushButton#pBtn_Pause:checked {
     border-image:url(:/music/Music/images/btn_play1.png);
 }
-QPushButton#pBtn_Pause:hover::checked
-{
+
+QPushButton#pBtn_Pause:hover:checked {
     border-image:url(:/music/Music/images/btn_play2.png);
 }
-QPushButton#pBtn_Pause::!checked
-{
+
+QPushButton#pBtn_Pause:!checked {
     border-image:url(:/music/Music/images/btn_pause1.png);
 }
-QPushButton#pBtn_Pause:hover::!checked
-{
+
+QPushButton#pBtn_Pause:hover:!checked {
     border-image:url(:/music/Music/images/btn_pause2.png);
 }
-QPushButton#pBtn_OpenSearchWin
-{
+
+QPushButton#pBtn_OpenSearchWin {
     border-image:url(:/music/Music/images/pBtn_Search1.png);
 }
-QPushButton#pBtn_OpenSearchWin:hover
-{
+
+QPushButton#pBtn_OpenSearchWin:hover {
     border-image:url(:/music/Music/images/pBtn_Search2.png);
 }
 
-QPushButton#pBtn_SetLove:checked
-{
-    border-image:url(:/music/Music/images/btn_favorite_yes.png);
-    rotation-point:50% 50%;
-    rotation:180deg;
+QPushButton#pBtn_SetLove,
+QPushButton#pBtn_loop,
+QPushButton#pBtn_Loud,
+QPushButton#pBtn_Low {
+    min-width: 60px;
+    min-height: 60px;
+    max-width: 60px;
+    max-height: 60px;
 }
 
-QPushButton#pBtn_SetLove:!checked
-{
+QPushButton#pBtn_SetLove:checked {
+    border-image:url(:/music/Music/images/btn_favorite_yes.png);
+}
+
+QPushButton#pBtn_SetLove:!checked {
     border-image:url(:/music/Music/images/btn_favorite_no.png);
 }
 
-QPushButton#pBtn_loop:checked
-{
-    border-image:url(:/music/Music/images/btn_listcircle1.png);
-}
-QPushButton#pBtn_loop:!checked
-{
+QPushButton#pBtn_loop:!checked {
     border-image:url(:/music/Music/images/btn_listcircle1.png);
 }
 
-QPushButton#pBtn_Loud
-{
+QPushButton#pBtn_loop:checked {
+    border-image:url(:/music/Music/images/btn_listcircle2.png);
+}
+
+QPushButton#pBtn_Loud {
     border-image:url(:/music/Music/images/btn_volume2.png);
 }
 
-QPushButton#pBtn_Low
-{
+QPushButton#pBtn_Low {
     border-image:url(:/music/Music/images/btn_volume1.png);
-}
-
-QSlider#horizontalSlider:handle:horizontal
-{
-    border-image:url(:/music/Music/images/handle.png);
-}
-
-QSlider#horizontalSlider:sub-page:horizontal
-{
-    border-image:url(:/music/Music/images/sub-page.png);
 }

@@ -87,6 +87,7 @@ private slots:
     void SongDownloadReadyRead();
     void SongDownloadDownloadProgress(qint64,qint64);
     void on_pushButton_clicked();
+    void on_pBtn_Back_clicked();
 };
 #endif // SEARCHMUSIC_H
 

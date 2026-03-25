@@ -8,6 +8,7 @@ Copyright © Deng Zhimao Co., Ltd. 2021-2030. All rights reserved.
 * @date          2021-11-19
 *******************************************************************/
 #include "capture_thread.h"
+#include <errno.h>
 
 void CaptureThread::run()
 {
@@ -19,7 +20,7 @@ void CaptureThread::run()
     int video_fd = -1;
     struct v4l2_format fmt;
     struct v4l2_requestbuffers req_bufs;
-    static struct v4l2_buffer buf;
+    struct v4l2_buffer buf;
     int n_buf;
     struct buffer_info bufs_info[VIDEO_BUFFER_COUNT];
     enum v4l2_buf_type type;
@@ -95,28 +96,35 @@ void CaptureThread::run()
 
     while (startFlag) {
 
-        for (n_buf = 0; n_buf < VIDEO_BUFFER_COUNT; n_buf++) {
+        memset(&buf, 0, sizeof(buf));
+        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        buf.memory = V4L2_MEMORY_MMAP;
 
-            buf.index = n_buf;
-
-            if (0 > ioctl(video_fd, VIDIOC_DQBUF, &buf)) {
-                printf("ERROR: failed to VIDIOC_DQBUF\n");
-                for (int i = 0; i < VIDEO_BUFFER_COUNT; i++)
-                    munmap(bufs_info[i].start, bufs_info[i].length);
-                close(video_fd);
-                return;
+        if (0 > ioctl(video_fd, VIDIOC_DQBUF, &buf)) {
+            if (errno == EINTR || errno == EAGAIN) {
+                continue;
             }
+            printf("ERROR: failed to VIDIOC_DQBUF\n");
+            break;
+        }
 
-            QImage qImage((unsigned char*)bufs_info[n_buf].start, fmt.fmt.pix.width, fmt.fmt.pix.height, QImage::Format_RGB16);
+        if (buf.index >= VIDEO_BUFFER_COUNT) {
+            printf("ERROR: invalid buffer index %d\n", buf.index);
+            break;
+        }
 
-            /* 是否开启本地显示*/
-            if (startLocalDisplay)
-                emit imageReady(qImage);
+        QImage qImage((unsigned char*)bufs_info[buf.index].start,
+                      fmt.fmt.pix.width,
+                      fmt.fmt.pix.height,
+                      QImage::Format_RGB16);
 
-            if (0 > ioctl(video_fd, VIDIOC_QBUF, &buf)) {
-                printf("ERROR: failed to VIDIOC_QBUF\n");
-                return;
-            }
+        /* 跨线程发图时做深拷贝，避免底层 mmap 缓冲被复用导致卡顿/撕裂 */
+        if (startLocalDisplay)
+            emit imageReady(qImage.copy());
+
+        if (0 > ioctl(video_fd, VIDIOC_QBUF, &buf)) {
+            printf("ERROR: failed to VIDIOC_QBUF\n");
+            break;
         }
     }
 

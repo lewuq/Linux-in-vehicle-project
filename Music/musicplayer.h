@@ -12,6 +12,10 @@
 #include <QNetworkReply>
 #include <QMessageBox>
 #include <QLocale>
+#include <QLabel>
+#include <QProgressBar>
+#include <QTimer>
+#include <QHash>
 
 #define MUSIC_COMMAND_CLOSE 0
 #define MUSIC_COMMAND_SHOW 1
@@ -72,13 +76,30 @@ private slots:
     void on_DownSong(QNetworkReply *reply);
 
     void on_pushButton_clicked();
+    void on_pBtn_Delete_clicked();
 public slots:
     void on_handleCommand(int);
+    void playRandomSong();
 private:
+    void initVolumeHud();
+    void updateVolumeHud(int volume);
+    void changeVolumeByStep(int delta);
+    QString songNameCachePath() const;
+    QString normalizedSongKey(const QString &filePath) const;
+    QString restoreSongDisplayName(const QString &filePath, const QString &fallback) const;
+    void rememberSongDisplayName(const QString &filePath, const QString &displayName);
+    void loadSongNameCache();
+    void saveSongNameCache() const;
+
     class SearchMusic *searchMusicWin;
     Ui::MusicPlayer *ui;
     QMediaPlayer *musicPlayer;
     QMediaPlaylist *musicPlayList;
+    QWidget *volumeHud;
+    QLabel *volumeValueLabel;
+    QProgressBar *volumeProgressBar;
+    QTimer *volumeHudHideTimer;
+    QHash<QString, QString> songNameCache;
     QString CurrentSaveSongFileName;
     QVector<MediaObjectInfo> SongInfoVector;
 

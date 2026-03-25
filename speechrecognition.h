@@ -34,6 +34,7 @@ signals:
     void RecordFinished();
 private slots:
     void timer_timerout();
+    void onRecorderStateChanged(QMediaRecorder::State state);
     static void getSpeechResult(QNetworkReply *reply);
 
 private:
@@ -47,6 +48,8 @@ private:
     QList<QVariant>channelsVar;
     QList<QVariant>qualityVar;
     QList<QVariant>bitratesVar;
+    qint64 recordStartMs = 0;
+    bool pendingRecordFinished = false;
 public:
     int key_fd;
     void startSpeechRecognition();
