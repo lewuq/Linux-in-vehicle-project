@@ -220,7 +220,7 @@ void Weather::getWeatherInfo(QNetworkReply *reply)
     ui->label_Time->setText(UpdateTime);
     ui->label_location->setText(cityName);
     
-    // ===== 军规三：网络请求数据及时释放 =====
+    // ===== 工程约束：网络请求数据及时释放 =====
     // 【关键】JSON解析完成后删除reply对象，防止内存堆积
     // 特别是对于长期运行的车载系统，及时释放很重要
     reply->deleteLater();

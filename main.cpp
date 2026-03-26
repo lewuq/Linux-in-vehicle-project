@@ -5,7 +5,7 @@
 #include <QScreen>
 #include "clock.h"
 
-// ===== 字体加载函数（军规四：独立字体文件） =====
+// ===== 字体加载函数（工程约束：独立字体资源） =====
 void loadEmbeddedFonts() {
     const int fontId = QFontDatabase::addApplicationFont(":/fonts/NotoSansCJK-Regular.ttc");
     if (fontId == -1) {
@@ -39,7 +39,7 @@ void loadEmbeddedFonts() {
     qDebug() << "[启动] 已启用内置中文字体:" << selectedFamily;
 }
 
-// ===== 全屏窗口设置函数（军规二：禁用窗口装饰） =====
+// ===== 全屏窗口设置函数（工程约束：嵌入式显示配置） =====
 void configureEmbeddedDisplay(QMainWindow *mainWin) {
     // 设置固定尺寸（i.MX6ULL标准分辨率）
     mainWin->setFixedSize(1024, 600);
@@ -71,13 +71,13 @@ int main(int argc, char *argv[])
     qputenv("QT_VIRTUALKEYBOARD_LOCALE", QByteArray("zh_CN"));
     QApplication a(argc, argv);
     
-    // ===== 第一步：加载字体（军规四） =====
+    // ===== 第一步：加载内置字体资源 =====
     loadEmbeddedFonts();
     
     // ===== 第二步：创建主窗口 =====
     MainWindow w;
     
-    // ===== 第三步：配置嵌入式显示（军规二） =====
+    // ===== 第三步：配置嵌入式显示参数 =====
     configureEmbeddedDisplay(&w);
     
     // ===== 第四步：显示主窗口 =====

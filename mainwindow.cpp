@@ -115,7 +115,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     
-    // ===== 军规二：禁用窗口装饰（补充配置） =====
+    // ===== 工程约束：窗口装饰控制（补充配置） =====
     // 主.pro和main.cpp中已设置全屏/固定尺寸，此处为额外防护
     this->setFocusPolicy(Qt::StrongFocus);  // 确保主窗口能接收所有键盘事件
     
@@ -288,7 +288,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->stackedWidget->installEventFilter(this);
     dht11 = new Dht11;
 
-    // ===== 军规三：子窗口创建（内存管理） =====
+    // ===== 工程约束：子窗口动态创建与内存管理 =====
     // 【重要】以下子窗口现在采用 new 动态分配，而非栈分配
     // 好处：1) 除非被显示，否则不占用内存；2) 支持懒加载；3) 便于后续优化成单例模式
     baiduMap = new BaiduMap(this);      // 地图模块
@@ -488,7 +488,7 @@ void MainWindow::getSpeechResult(QNetworkReply *reply)
         qDebug()<<"未识别的指令:"<<AsrResult;
     }
     
-    // ===== 军规三：网络数据及时释放 =====
+    // ===== 工程约束：网络数据及时释放 =====
     // 【关键】解析完 JSON 后立刻释放 QNetworkReply 对象
     // 防止长期占用缓冲区，导致 512MB 内存设备 OOM
     reply->deleteLater();
