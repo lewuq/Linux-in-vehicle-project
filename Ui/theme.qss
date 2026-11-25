@@ -19,7 +19,7 @@ QPushButton:pressed, QPushButton:checked { background: #edf1e8; color: #53665b; 
 QPushButton:disabled { color: #aaa99f; background: #faf9f6; }
 QPushButton[primary="true"] { background: #53665b; color: #ffffff; border: 0; }
 QPushButton[primary="true"]:pressed { background: #6c7e60; }
-QPushButton[nav="true"] { background: transparent; border: 0; border-radius: 15px; padding: 8px 4px; font-size: 13px; }
+QPushButton[nav="true"] { background: transparent; border: 0; border-radius: 15px; padding: 0; min-height: 62px; max-height: 62px; min-width: 64px; max-width: 64px; font-size: 13px; }
 QPushButton[nav="true"]:checked { background: #e5eadc; color: #53665b; }
 QPushButton[quick="true"] { text-align: left; padding: 16px; border-radius: 18px; font-size: 17px; }
 QListWidget { background: #ffffff; border: 1px solid #e8e7e1; border-radius: 16px; padding: 8px; }

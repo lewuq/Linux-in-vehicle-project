@@ -15,10 +15,12 @@ static QString durationText(qint64 ms) {
 }
 OneVideo::OneVideo(QWidget *parent) : QWidget(parent), library(this) {
     setObjectName("page");
+    UiKit::setAccent(this, "video");
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(8, 4, 8, 8);
     root->setSpacing(14);
     auto *header = new QHBoxLayout;
+    header->addWidget(UiKit::iconLabel("video", "video", 34, true));
     header->addWidget(UiKit::label(QStringLiteral("本地影院"), "title"));
     header->addStretch();
     scanButton = UiKit::button(QStringLiteral("扫描视频"), "refresh");
@@ -46,6 +48,7 @@ OneVideo::OneVideo(QWidget *parent) : QWidget(parent), library(this) {
     auto *controls = new QHBoxLayout;
     auto *prev = UiKit::button(QString(), "previous");
     playButton = UiKit::button(QStringLiteral("播放"), "play");
+    UiKit::setPrimary(playButton, "video");
     auto *next = UiKit::button(QString(), "next");
     controls->addWidget(prev);
     controls->addWidget(playButton);
@@ -110,6 +113,7 @@ OneVideo::OneVideo(QWidget *parent) : QWidget(parent), library(this) {
                 I18n::setText(status, QStringLiteral("播放失败：%1").arg(player.errorString()));
             });
     ScanLocalVideos();
+    UiKit::refreshIcons(this);
 }
 void OneVideo::ScanLocalVideos() {
     if (library.isScanning())
@@ -150,5 +154,5 @@ void OneVideo::onPrevVideo() {
 void OneVideo::updateControls() {
     const bool playing = player.state() == QMediaPlayer::PlayingState;
     I18n::setText(playButton, playing ? QStringLiteral("暂停") : QStringLiteral("播放"));
-    playButton->setIcon(UiKit::icon(playing ? "pause" : "play"));
+    UiKit::setButtonIcon(playButton, playing ? "pause" : "play", "video");
 }

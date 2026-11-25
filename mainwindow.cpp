@@ -49,27 +49,29 @@ MainWindow::MainWindow(QWidget *parent)
     nav->setSpacing(5);
     auto *brand = UiKit::label(QString());
     brand->setAlignment(Qt::AlignCenter);
-    I18n::setPixmap(brand, UiKit::icon("car", QColor("#53665b"), 30).pixmap(30, 30));
+    UiKit::setIcon(brand, "car", "home", 30);
     nav->addWidget(brand);
     nav->addSpacing(14);
     for (int i = 0; i < names.size(); ++i) {
         auto *button = new QPushButton;
         button->setObjectName("nav_" + symbols[i]);
         button->setProperty("nav", true);
+        UiKit::setAccent(button, symbols[i]);
         button->setCheckable(true);
-        button->setFixedSize(64, 60);
+        button->setFixedSize(64, 62);
         I18n::setProperty(button, "accessibleName", names[i]);
         auto *column = new QVBoxLayout(button);
         column->setContentsMargins(2, 4, 2, 4);
         column->setSpacing(2);
         auto *icon = UiKit::label(QString());
-        I18n::setPixmap(icon, UiKit::icon(symbols[i]).pixmap(24, 24));
+        UiKit::setIcon(icon, symbols[i], symbols[i], 30, true);
+        icon->setFixedSize(30, 30);
         icon->setAlignment(Qt::AlignCenter);
         auto *text = UiKit::label(names[i], "muted");
         text->setAlignment(Qt::AlignCenter);
         icon->setAttribute(Qt::WA_TransparentForMouseEvents);
         text->setAttribute(Qt::WA_TransparentForMouseEvents);
-        column->addWidget(icon);
+        column->addWidget(icon, 0, Qt::AlignHCenter);
         column->addWidget(text);
         nav->addWidget(button);
         navigation.append(button);
@@ -101,17 +103,19 @@ MainWindow::MainWindow(QWidget *parent)
     content->addWidget(stack, 1);
     auto *footer = new QFrame;
     footer->setObjectName("footer");
+    UiKit::setAccent(footer, "music");
     footer->setFixedHeight(72);
     auto *footerLayout = new QHBoxLayout(footer);
     footerLayout->setContentsMargins(4, 10, 4, 10);
     auto *note = UiKit::label(QString());
-    I18n::setPixmap(note, UiKit::icon("music").pixmap(24, 24));
+    UiKit::setIcon(note, "music", "music", 28, true);
     footerLayout->addWidget(note);
     footerSong = UiKit::label(QStringLiteral("音乐，让旅途慢下来"), "muted");
     footerSong->setMaximumWidth(270);
     footerLayout->addWidget(footerSong, 1);
     footerPlay = UiKit::button(QString(), "play");
     footerPlay->setFixedWidth(50);
+    UiKit::setPrimary(footerPlay, "music");
     footerLayout->addWidget(footerPlay);
     auto *volume = UiKit::button(QString(), "volume");
     volume->setCheckable(true);
@@ -129,6 +133,7 @@ MainWindow::MainWindow(QWidget *parent)
     auto *mic = UiKit::button(QString(), "mic");
     I18n::setProperty(mic, "toolTip", QStringLiteral("按住录音，松开识别"));
     mic->setObjectName("voiceButton");
+    UiKit::setAccent(mic, "video");
     footerLayout->addWidget(mic);
     content->addWidget(footer);
     connect(mic, &QPushButton::pressed, speech, &SpeechService::start);
@@ -178,6 +183,7 @@ MainWindow::MainWindow(QWidget *parent)
     updateClock();
     updateStatus();
     QTimer::singleShot(0, weather, &WeatherService::refresh);
+    UiKit::refreshIcons(this);
 }
 MainWindow::~MainWindow() {
     sensor->requestInterruption();
@@ -205,6 +211,7 @@ QWidget *MainWindow::createHome() {
     top->setSpacing(14);
     auto *hero = UiKit::card();
     hero->setObjectName("heroCard");
+    UiKit::setAccent(hero, "home", true);
     auto *heroRow = new QHBoxLayout(hero);
     heroRow->setContentsMargins(24, 18, 16, 18);
     auto *clockColumn = new QVBoxLayout;
@@ -218,13 +225,14 @@ QWidget *MainWindow::createHome() {
     heroRow->addWidget(new RoadArtwork, 2);
     top->addWidget(hero, 5);
     auto *weatherCard = UiKit::card();
+    UiKit::setAccent(weatherCard, "weather", true);
     auto *weatherLayout = new QVBoxLayout(weatherCard);
     weatherLayout->setContentsMargins(20, 18, 20, 18);
     auto *weatherTop = new QHBoxLayout;
     weatherTop->addWidget(UiKit::label(QStringLiteral("沿途天气"), "muted"));
     weatherTop->addStretch();
     weatherImage = UiKit::label(QString());
-    I18n::setPixmap(weatherImage, UiKit::icon("weather", QColor("#a89468"), 30).pixmap(30, 30));
+    UiKit::setIcon(weatherImage, "weather", "weather", 32, true);
     weatherTop->addWidget(weatherImage);
     weatherLayout->addLayout(weatherTop);
     weatherLabel = UiKit::label("--°", "metric");
@@ -244,6 +252,8 @@ QWidget *MainWindow::createHome() {
         const int index = shortcuts[i];
         auto *button = UiKit::button(captions[i], symbols[index]);
         button->setProperty("quick", true);
+        UiKit::setAccent(button, symbols[index]);
+        UiKit::setButtonIcon(button, symbols[index], symbols[index], 36, true);
         button->setMinimumHeight(66);
         connect(button, &QPushButton::clicked, this, [this, index]() { openPage(index); });
         quick->addWidget(button, 1);
@@ -252,15 +262,21 @@ QWidget *MainWindow::createHome() {
     auto *bottom = new QHBoxLayout;
     bottom->setSpacing(14);
     auto *playing = UiKit::card();
+    UiKit::setAccent(playing, "music", true);
     auto *playingLayout = new QVBoxLayout(playing);
     playingLayout->setContentsMargins(20, 16, 20, 16);
-    playingLayout->addWidget(UiKit::label(QStringLiteral("正在播放"), "muted"));
+    auto *playingHeader = new QHBoxLayout;
+    playingHeader->addWidget(UiKit::iconLabel("music", "music", 22));
+    playingHeader->addWidget(UiKit::label(QStringLiteral("正在播放"), "muted"));
+    playingHeader->addStretch();
+    playingLayout->addLayout(playingHeader);
     songLabel = UiKit::label(QStringLiteral("留一点时间给喜欢的旋律"), "heading");
     songLabel->setWordWrap(true);
     playingLayout->addWidget(songLabel);
     auto *playRow = new QHBoxLayout;
     auto *previous = UiKit::button(QString(), "previous");
     homePlay = UiKit::button(QStringLiteral("播放音乐"), "play");
+    UiKit::setPrimary(homePlay, "music");
     auto *next = UiKit::button(QString(), "next");
     playRow->addWidget(previous);
     playRow->addWidget(homePlay, 1);
@@ -271,14 +287,23 @@ QWidget *MainWindow::createHome() {
     connect(next, &QPushButton::clicked, this, [this]() { ensureMusic()->next(); });
     bottom->addWidget(playing, 5);
     auto *environment = UiKit::card();
+    UiKit::setAccent(environment, "climate", true);
     auto *envLayout = new QVBoxLayout(environment);
     envLayout->setContentsMargins(20, 16, 20, 16);
-    envLayout->addWidget(UiKit::label(QStringLiteral("环境感知"), "muted"));
+    auto *environmentHeader = new QHBoxLayout;
+    environmentHeader->addWidget(UiKit::iconLabel("humidity", "climate", 22));
+    environmentHeader->addWidget(UiKit::label(QStringLiteral("环境感知"), "muted"));
+    environmentHeader->addStretch();
+    envLayout->addLayout(environmentHeader);
     auto *metrics = new QHBoxLayout;
     temperatureLabel = UiKit::label("-- °C", "metric");
     humidityLabel = UiKit::label("-- %", "metric");
+    metrics->addWidget(UiKit::iconLabel("temperature", "temperature", 24));
+    UiKit::setAccent(temperatureLabel, "temperature");
     metrics->addWidget(temperatureLabel);
     metrics->addStretch();
+    metrics->addWidget(UiKit::iconLabel("humidity", "humidity", 24));
+    UiKit::setAccent(humidityLabel, "humidity");
     metrics->addWidget(humidityLabel);
     envLayout->addLayout(metrics);
     sensorLabel = UiKit::label(QStringLiteral("等待传感器"), "muted");
@@ -319,8 +344,8 @@ QWidget *MainWindow::ensurePage(int index) {
             footerSong->setToolTip(title);
             I18n::setText(homePlay,
                           playing ? QStringLiteral("暂停播放") : QStringLiteral("播放音乐"));
-            homePlay->setIcon(UiKit::icon(playing ? "pause" : "play"));
-            footerPlay->setIcon(UiKit::icon(playing ? "pause" : "play"));
+            UiKit::setButtonIcon(homePlay, playing ? "pause" : "play", "music");
+            UiKit::setButtonIcon(footerPlay, playing ? "pause" : "play", "music");
         });
         connect(music, &MusicPlayer::volumeChanged, volumeSlider, &QSlider::setValue);
         break;
@@ -392,6 +417,9 @@ void MainWindow::updateClock() {
 }
 void MainWindow::updateStatus() {
     I18n::setText(networkLabel, SystemStatus::network());
+    UiKit::setStatus(networkLabel,
+                     SystemStatus::network() == QStringLiteral("网络已连接") ? "ready" : "idle");
+    UiKit::setStatus(positionLabel, gnss->fix().valid ? "ready" : "idle");
     I18n::setText(positionLabel,
                   gnss->fix().valid ? QStringLiteral("定位已就绪") : QStringLiteral("定位未就绪"));
 }

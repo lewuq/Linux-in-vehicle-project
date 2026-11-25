@@ -15,12 +15,14 @@ static QString timestamp(qint64 ms) {
 }
 MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), downloads(this) {
     setObjectName("page");
+    UiKit::setAccent(this, "music");
     auto *page = new QWidget(this);
     auto *root = new QVBoxLayout(page);
     root->setContentsMargins(8, 4, 8, 8);
     root->setSpacing(16);
     setCentralWidget(page);
     auto *top = new QHBoxLayout;
+    top->addWidget(UiKit::iconLabel("music", "music", 34, true));
     top->addWidget(UiKit::label(QStringLiteral("音乐空间"), "title"));
     top->addStretch();
     filterButton = UiKit::button(QStringLiteral("全部音乐"), "heart");
@@ -34,11 +36,12 @@ MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), 
     auto *body = new QHBoxLayout;
     body->setSpacing(16);
     auto *art = UiKit::card();
+    UiKit::setAccent(art, "music", true);
     auto *artLayout = new QVBoxLayout(art);
     artLayout->setContentsMargins(20, 12, 20, 12);
     auto *disc = UiKit::label(QString(), "body");
     disc->setAlignment(Qt::AlignCenter);
-    I18n::setPixmap(disc, UiKit::icon("music", QColor("#8a9b78"), 48).pixmap(48, 48));
+    UiKit::setIcon(disc, "music", "music", 48, true);
     disc->setFixedHeight(50);
     artLayout->addStretch();
     artLayout->addWidget(disc);
@@ -70,11 +73,12 @@ MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), 
     progress->addWidget(time);
     controlLayout->addLayout(progress);
     auto *row = new QHBoxLayout;
-    modeButton = UiKit::button(QStringLiteral("列表循环"));
+    modeButton = UiKit::button(QStringLiteral("列表循环"), "repeat");
     auto *prev = UiKit::button(QString(), "previous");
     auto *nextButton = UiKit::button(QString(), "next");
     playButton = UiKit::button(QStringLiteral("播放"), "play");
     playButton->setMinimumWidth(112);
+    UiKit::setPrimary(playButton, "music");
     volumeSlider = new QSlider(Qt::Horizontal);
     volumeSlider->setRange(0, 100);
     volumeSlider->setMaximumWidth(150);
@@ -211,6 +215,7 @@ MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), 
     });
     saveTimer->start();
     ScanLocalSongs();
+    UiKit::refreshIcons(this);
 }
 QString MusicPlayer::currentTitle() const {
     const int i = playlist.currentIndex();
@@ -246,7 +251,7 @@ void MusicPlayer::updateCurrent() {
     else
         I18n::setLiteralText(title, currentTitle());
     I18n::setText(playButton, isPlaying() ? QStringLiteral("暂停") : QStringLiteral("播放"));
-    playButton->setIcon(UiKit::icon(isPlaying() ? "pause" : "play"));
+    UiKit::setButtonIcon(playButton, isPlaying() ? "pause" : "play", "music");
     const QString path = playlist.currentMedia().request().url().toLocalFile();
     favoriteButton->setChecked(favorites.contains(path));
     I18n::setText(favoriteButton,

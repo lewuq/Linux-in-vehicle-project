@@ -17,6 +17,7 @@
 ## Features
 
 - One native window, persistent navigation and pages created on demand.
+- Warm-white surfaces with feature colors: green maps, coral music, purple video, amber weather, teal camera and warm-gray settings. Icons and controls follow the same palette, including night mode.
 - Live Simplified Chinese / English switching in Settings. Chinese is the first-run default; language preference is saved without recreating pages or interrupting playback.
 - Local/SD music, favorites, playback modes, seeking, playback memory and isolated streaming downloads.
 - Local video with playback/volume controls and automatic pause when leaving the page.

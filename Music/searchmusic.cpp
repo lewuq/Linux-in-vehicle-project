@@ -12,6 +12,7 @@
 #include <QVBoxLayout>
 SearchMusic::SearchMusic(QWidget *parent) : QMainWindow(parent) {
     setObjectName("page");
+    UiKit::setAccent(this, "music");
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
     layout->setContentsMargins(20, 20, 20, 20);
@@ -20,7 +21,7 @@ SearchMusic::SearchMusic(QWidget *parent) : QMainWindow(parent) {
     auto *back = UiKit::button(QStringLiteral("返回音乐"), "back");
     query = new QLineEdit;
     I18n::setProperty(query, "placeholderText", QStringLiteral("搜索歌曲或歌手"));
-    searchButton = UiKit::button(QStringLiteral("搜索"), "music");
+    searchButton = UiKit::button(QStringLiteral("搜索"), "search");
     row->addWidget(back);
     row->addWidget(query, 1);
     row->addWidget(searchButton);
@@ -43,6 +44,7 @@ SearchMusic::SearchMusic(QWidget *parent) : QMainWindow(parent) {
         emit AddUrlMusic(item->text(), item->data(Qt::UserRole).toString());
         hide();
     });
+    UiKit::refreshIcons(this);
 }
 void SearchMusic::search() {
     if (query->text().trimmed().isEmpty())

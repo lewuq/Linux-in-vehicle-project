@@ -25,14 +25,17 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     : QMainWindow(parent), gnss(service), wifi(new WifiService(this)),
       clock(new TimeService(this)) {
     setObjectName("page");
+    UiKit::setAccent(this, "settings");
     auto *page = new QWidget;
     auto *root = new QVBoxLayout(page);
     root->setContentsMargins(8, 4, 8, 8);
     root->setSpacing(14);
     setCentralWidget(page);
     auto *heading = new QHBoxLayout;
+    heading->addWidget(UiKit::iconLabel("settings", "settings", 34, true));
     heading->addWidget(UiKit::label(QStringLiteral("设置中心"), "title"));
     heading->addStretch();
+    heading->addWidget(UiKit::iconLabel("language", "settings", 24));
     heading->addWidget(UiKit::label(QStringLiteral("界面语言"), "muted"));
     auto *chinese = UiKit::button(QStringLiteral("简体中文"));
     auto *english = UiKit::button("English");
@@ -57,11 +60,13 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     auto *tabs = new QTabWidget;
     root->addWidget(tabs, 1);
     auto *networkPage = new QWidget;
+    UiKit::setAccent(networkPage, "network");
     auto *networkLayout = new QVBoxLayout(networkPage);
     networkLayout->setContentsMargins(12, 16, 12, 8);
     auto *wifiRow = new QHBoxLayout;
     onButton = UiKit::button(QStringLiteral("开启 Wi-Fi"), "wifi");
-    offButton = UiKit::button(QStringLiteral("关闭"));
+    offButton = UiKit::button(QStringLiteral("关闭"), "power");
+    UiKit::setAccent(offButton, "home");
     scanButton = UiKit::button(QStringLiteral("扫描网络"), "refresh");
     wifiRow->addWidget(onButton);
     wifiRow->addWidget(offButton);
@@ -76,6 +81,7 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     password->setEchoMode(QLineEdit::Password);
     I18n::setProperty(password, "placeholderText", QStringLiteral("所选网络的密码"));
     connectButton = UiKit::button(QStringLiteral("连接网络"), "wifi");
+    UiKit::setPrimary(connectButton, "network");
     authRow->addWidget(password, 1);
     authRow->addWidget(connectButton);
     networkLayout->addLayout(authRow);
@@ -83,27 +89,33 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     networkLayout->addWidget(wifiStatus);
     I18n::addTab(tabs, networkPage, QStringLiteral("网络连接"));
     auto *displayPage = new QWidget;
+    UiKit::setAccent(displayPage, "display");
     auto *displayLayout = new QVBoxLayout(displayPage);
     displayLayout->setContentsMargins(16, 18, 16, 12);
     displayLayout->setSpacing(14);
     auto *night = new QCheckBox;
     I18n::setText(night, QStringLiteral("夜间模式"));
+    UiKit::setButtonIcon(night, "moon", "video", 26, true);
     night->setChecked(QSettings().value("display/night", false).toBool());
     auto *large = new QCheckBox;
     I18n::setText(large, QStringLiteral("大字模式"));
+    UiKit::setButtonIcon(large, "text", "settings", 26, true);
     large->setChecked(QSettings().value("display/large", false).toBool());
     displayLayout->addWidget(night);
     displayLayout->addWidget(large);
     auto *themeInfo = UiKit::label(QStringLiteral("显示偏好会自动保存，下次启动时恢复。"), "muted");
     displayLayout->addWidget(themeInfo);
     auto *volumeRow = new QHBoxLayout;
+    volumeRow->addWidget(UiKit::iconLabel("volume", "music", 26, true));
     volumeRow->addWidget(UiKit::label(QStringLiteral("媒体音量")));
     volumeSlider = new QSlider(Qt::Horizontal);
     volumeSlider->setRange(0, 100);
+    UiKit::setAccent(volumeSlider, "music");
     volumeSlider->setValue(QSettings().value("audio/volume", 35).toInt());
     volumeRow->addWidget(volumeSlider, 1);
     displayLayout->addLayout(volumeRow);
     auto *brightnessRow = new QHBoxLayout;
+    brightnessRow->addWidget(UiKit::iconLabel("weather", "weather", 26, true));
     brightnessRow->addWidget(UiKit::label(QStringLiteral("屏幕亮度")));
     auto *brightness = new QSlider(Qt::Horizontal);
     brightness->setRange(5, 100);
@@ -149,6 +161,7 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     displayLayout->addStretch();
     I18n::addTab(tabs, displayPage, QStringLiteral("显示与声音"));
     auto *devicePage = new QWidget;
+    UiKit::setAccent(devicePage, "camera");
     auto *deviceLayout = new QVBoxLayout(devicePage);
     deviceLayout->setContentsMargins(16, 18, 16, 12);
     deviceLayout->setSpacing(16);
@@ -156,6 +169,7 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     gnssStatus = UiKit::label(gnss->status());
     auto *gnssToggle = new QCheckBox;
     I18n::setText(gnssToggle, QStringLiteral("开启 GNSS 定位"));
+    UiKit::setButtonIcon(gnssToggle, "pin", "map", 26, true);
     gnssToggle->setChecked(gnss->isEnabled());
     positionRow->addWidget(gnssToggle);
     positionRow->addStretch();
@@ -171,14 +185,24 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     storage = UiKit::label(QString());
     uptime = UiKit::label(QString());
     deviceLayout->addWidget(UiKit::label(QStringLiteral("设备运行状态"), "heading"));
-    deviceLayout->addWidget(memory);
-    deviceLayout->addWidget(storage);
-    deviceLayout->addWidget(uptime);
+    auto *memoryRow = new QHBoxLayout;
+    memoryRow->addWidget(UiKit::iconLabel("chip", "video", 26, true));
+    memoryRow->addWidget(memory, 1);
+    deviceLayout->addLayout(memoryRow);
+    auto *storageRow = new QHBoxLayout;
+    storageRow->addWidget(UiKit::iconLabel("storage", "settings", 26, true));
+    storageRow->addWidget(storage, 1);
+    deviceLayout->addLayout(storageRow);
+    auto *uptimeRow = new QHBoxLayout;
+    uptimeRow->addWidget(UiKit::iconLabel("clock", "weather", 26, true));
+    uptimeRow->addWidget(uptime, 1);
+    deviceLayout->addLayout(uptimeRow);
     deviceLayout->addStretch();
     deviceLayout->addWidget(UiKit::label(
         QStringLiteral("目标平台  NXP i.MX6ULL   ·   显示  1024 × 600   ·   Qt Widgets"), "muted"));
     I18n::addTab(tabs, devicePage, QStringLiteral("设备状态"));
     auto *timePage = new QWidget;
+    UiKit::setAccent(timePage, "clock");
     auto *timeLayout = new QVBoxLayout(timePage);
     timeLayout->setContentsMargins(16, 18, 16, 12);
     timeLayout->addWidget(UiKit::label(QStringLiteral("日期与时间"), "heading"));
@@ -187,8 +211,9 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     datetime->setCalendarPopup(true);
     timeLayout->addWidget(datetime);
     auto *timeRow = new QHBoxLayout;
-    applyButton = UiKit::button(QStringLiteral("应用手动时间"));
+    applyButton = UiKit::button(QStringLiteral("应用手动时间"), "clock");
     syncButton = UiKit::button(QStringLiteral("联网校时"), "refresh");
+    UiKit::setPrimary(syncButton, "clock");
     timeRow->addWidget(applyButton);
     timeRow->addWidget(syncButton);
     timeRow->addStretch();
@@ -198,6 +223,15 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     timeLayout->addWidget(timeStatus);
     timeLayout->addStretch();
     I18n::addTab(tabs, timePage, QStringLiteral("日期时间"));
+    UiKit::setTabIcon(tabs, 0, "wifi", "network");
+    UiKit::setTabIcon(tabs, 1, "weather", "display");
+    UiKit::setTabIcon(tabs, 2, "chip", "camera");
+    UiKit::setTabIcon(tabs, 3, "clock", "clock");
+    UiKit::setAccent(tabs, "network");
+    connect(tabs, &QTabWidget::currentChanged, this, [tabs](int index) {
+        const QStringList accents = {"network", "display", "camera", "clock"};
+        UiKit::setAccent(tabs, accents.value(index, "settings"));
+    });
     connect(applyButton, &QPushButton::clicked, this,
             [this, datetime]() { clock->setTime(datetime->dateTime()); });
     connect(syncButton, &QPushButton::clicked, clock, &TimeService::sync);
@@ -224,6 +258,7 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     connect(&refresh, &QTimer::timeout, this, &SettingWindow::renderSystem);
     renderWifi();
     renderSystem();
+    UiKit::refreshIcons(this);
 }
 void SettingWindow::setVolume(int value) {
     QSignalBlocker block(volumeSlider);

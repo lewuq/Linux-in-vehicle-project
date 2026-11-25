@@ -17,12 +17,14 @@ static QPixmap weatherIcon(const QString &name, int size) {
 Weather::Weather(WeatherService *weatherService, QWidget *parent)
     : QMainWindow(parent), service(weatherService) {
     setObjectName("page");
+    UiKit::setAccent(this, "weather");
     auto *page = new QWidget;
     auto *root = new QVBoxLayout(page);
     root->setContentsMargins(8, 4, 8, 8);
     root->setSpacing(16);
     setCentralWidget(page);
     auto *header = new QHBoxLayout;
+    header->addWidget(UiKit::iconLabel("weather", "weather", 34, true));
     header->addWidget(UiKit::label(QStringLiteral("沿途天气"), "title"));
     header->addStretch();
     cityInput = new QLineEdit;
@@ -30,12 +32,14 @@ Weather::Weather(WeatherService *weatherService, QWidget *parent)
     I18n::setProperty(cityInput, "placeholderText", QStringLiteral("输入城市"));
     auto *change = UiKit::button(QStringLiteral("切换城市"), "pin");
     refreshButton = UiKit::button(QStringLiteral("刷新"), "refresh");
+    UiKit::setPrimary(refreshButton, "weather");
     header->addWidget(cityInput);
     header->addWidget(change);
     header->addWidget(refreshButton);
     root->addLayout(header);
     auto *hero = UiKit::card();
     hero->setObjectName("heroCard");
+    UiKit::setAccent(hero, "weather", true);
     auto *heroRow = new QHBoxLayout(hero);
     heroRow->setContentsMargins(30, 20, 30, 20);
     auto *info = new QVBoxLayout;
@@ -48,7 +52,7 @@ Weather::Weather(WeatherService *weatherService, QWidget *parent)
     heroRow->addLayout(info, 1);
     image = UiKit::label(QString());
     image->setAlignment(Qt::AlignCenter);
-    I18n::setPixmap(image, UiKit::icon("weather", QColor("#8a9b78"), 120).pixmap(120, 120));
+    UiKit::setIcon(image, "weather", "weather", 110);
     heroRow->addWidget(image, 1);
     root->addWidget(hero, 1);
     auto *forecast = new QHBoxLayout;
@@ -78,6 +82,7 @@ Weather::Weather(WeatherService *weatherService, QWidget *parent)
     connect(&I18n::instance(), &I18n::languageChanged, this, &Weather::render);
     render();
     service->refresh();
+    UiKit::refreshIcons(this);
 }
 void Weather::render() {
     const auto &report = service->report();
@@ -99,6 +104,7 @@ void Weather::render() {
     const auto &today = report.days.first();
     I18n::setText(temperature, today.high + "°");
     I18n::setText(description, today.description + " · " + today.wind);
+    image->setProperty("uiIconName", QString());
     I18n::setPixmap(image, weatherIcon(today.icon, 128));
     const QLocale locale = I18n::instance().locale();
     for (int i = 0; i < dates.size(); ++i) {

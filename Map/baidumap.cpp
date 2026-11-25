@@ -11,18 +11,21 @@
 #include <QVBoxLayout>
 BaiduMap::BaiduMap(GnssService *service, QWidget *parent) : QMainWindow(parent), gnss(service) {
     setObjectName("page");
+    UiKit::setAccent(this, "map");
     auto *page = new QWidget;
     auto *root = new QVBoxLayout(page);
     root->setContentsMargins(8, 4, 8, 8);
     root->setSpacing(14);
     setCentralWidget(page);
     auto *row = new QHBoxLayout;
+    row->addWidget(UiKit::iconLabel("map", "map", 34, true));
     row->addWidget(UiKit::label(QStringLiteral("地图与位置"), "title"));
     row->addStretch();
     search = new QLineEdit;
     I18n::setProperty(search, "placeholderText", QStringLiteral("搜索城市或地点"));
     search->setMaximumWidth(220);
-    auto *go = UiKit::button(QStringLiteral("查看"), "pin");
+    auto *go = UiKit::button(QStringLiteral("查看"), "search");
+    UiKit::setPrimary(go, "map");
     auto *locate = UiKit::button(QStringLiteral("我的位置"), "map");
     row->addWidget(search);
     row->addWidget(go);
@@ -84,6 +87,7 @@ BaiduMap::BaiduMap(GnssService *service, QWidget *parent) : QMainWindow(parent),
     });
     connect(gnss, &GnssService::updated, this, &BaiduMap::updateFix);
     updateFix();
+    UiKit::refreshIcons(this);
 }
 void BaiduMap::updateFix() {
     const auto fix = gnss->fix();

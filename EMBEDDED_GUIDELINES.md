@@ -20,6 +20,7 @@
 
 - The application targets 1024 × 600. Preserve at least 48-pixel touch targets for primary controls.
 - Keep interface colors in `Ui/theme.qss` and shared line icons in `Ui/uikit.cpp`.
+- Feature palettes, badges and night-aware icon colors are centralized in `Ui/uikit.cpp`. Use the accent and icon helpers so navigation, controls and settings remain consistent in both display modes.
 - Bind interface text through `Core/i18n.h`; English strings live in `Translations/en_US.json` and Chinese is the first-run default. Literal user data uses `setLiteralText`, and `setPixmap` clears stale placeholder bindings before displaying images.
 - Compressed JPEG and PNG file sizes do not predict decoded pixmap memory use. Measure resident memory on the board.
 - `hide()` does not free a page. Pause video/camera and hidden-page polling explicitly.

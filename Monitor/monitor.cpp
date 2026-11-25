@@ -5,15 +5,18 @@
 #include <QVBoxLayout>
 Monitor::Monitor(QWidget *parent) : QMainWindow(parent), capture(this), sensor(this) {
     setObjectName("page");
+    UiKit::setAccent(this, "camera");
     auto *page = new QWidget;
     auto *root = new QVBoxLayout(page);
     root->setContentsMargins(8, 4, 8, 8);
     setCentralWidget(page);
     auto *top = new QHBoxLayout;
+    top->addWidget(UiKit::iconLabel("camera", "camera", 34, true));
     top->addWidget(UiKit::label(QStringLiteral("摄像头影像"), "title"));
     top->addStretch();
     fps = UiKit::label("-- FPS", "muted");
     toggle = UiKit::button(QStringLiteral("启动影像"), "camera");
+    UiKit::setPrimary(toggle, "camera");
     top->addWidget(fps);
     top->addWidget(toggle);
     root->addLayout(top);
@@ -70,6 +73,7 @@ Monitor::Monitor(QWidget *parent) : QMainWindow(parent), capture(this), sensor(t
         I18n::setText(proximity, value.isEmpty() ? QStringLiteral("接近度传感器不可用")
                                                  : QStringLiteral("接近度原始值 %1").arg(value));
     });
+    UiKit::refreshIcons(this);
 }
 Monitor::~Monitor() {
     myStop();

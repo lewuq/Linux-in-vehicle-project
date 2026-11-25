@@ -328,6 +328,18 @@ private slots:
             if (button->isVisible() && button->objectName().startsWith("nav_")) {
                 const QPoint point = button->mapTo(&window, QPoint(0, 0));
                 QVERIFY(window.rect().contains(QRect(point, button->size())));
+                QLabel *glyph = nullptr;
+                QLabel *caption = nullptr;
+                for (auto *label : button->findChildren<QLabel *>()) {
+                    if (!label->property("uiIconName").toString().isEmpty())
+                        glyph = label;
+                    if (!label->text().isEmpty())
+                        caption = label;
+                }
+                QVERIFY(glyph && caption);
+                QVERIFY(button->rect().contains(glyph->geometry()));
+                QVERIFY(button->rect().contains(caption->geometry()));
+                QVERIFY(!glyph->geometry().intersects(caption->geometry()));
             }
         }
         window.openPage(0);
