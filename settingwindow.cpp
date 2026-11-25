@@ -1,9 +1,11 @@
 #include "settingwindow.h"
 #include "Core/gnssservice.h"
+#include "Core/i18n.h"
 #include "Core/systemstatus.h"
 #include "Core/timeservice.h"
 #include "Core/wifiservice.h"
 #include "Ui/uikit.h"
+#include <QButtonGroup>
 #include <QCheckBox>
 #include <QDateTimeEdit>
 #include <QDir>
@@ -31,7 +33,26 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     auto *heading = new QHBoxLayout;
     heading->addWidget(UiKit::label(QStringLiteral("设置中心"), "title"));
     heading->addStretch();
-    heading->addWidget(UiKit::label(QStringLiteral("让每次出发更从容"), "muted"));
+    heading->addWidget(UiKit::label(QStringLiteral("界面语言"), "muted"));
+    auto *chinese = UiKit::button(QStringLiteral("简体中文"));
+    auto *english = UiKit::button("English");
+    chinese->setObjectName("languageChinese");
+    english->setObjectName("languageEnglish");
+    chinese->setCheckable(true);
+    english->setCheckable(true);
+    auto *languages = new QButtonGroup(this);
+    languages->addButton(chinese);
+    languages->addButton(english);
+    heading->addWidget(chinese);
+    heading->addWidget(english);
+    auto showLanguage = [chinese, english]() {
+        chinese->setChecked(I18n::instance().language() == "zh_CN");
+        english->setChecked(I18n::instance().language() == "en_US");
+    };
+    showLanguage();
+    connect(chinese, &QPushButton::clicked, this, []() { I18n::instance().setLanguage("zh_CN"); });
+    connect(english, &QPushButton::clicked, this, []() { I18n::instance().setLanguage("en_US"); });
+    connect(&I18n::instance(), &I18n::languageChanged, this, showLanguage);
     root->addLayout(heading);
     auto *tabs = new QTabWidget;
     root->addWidget(tabs, 1);
@@ -51,22 +72,25 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     networkLayout->addWidget(networks, 1);
     auto *authRow = new QHBoxLayout;
     password = new QLineEdit;
+    password->setObjectName("wifiPassword");
     password->setEchoMode(QLineEdit::Password);
-    password->setPlaceholderText(QStringLiteral("所选网络的密码"));
+    I18n::setProperty(password, "placeholderText", QStringLiteral("所选网络的密码"));
     connectButton = UiKit::button(QStringLiteral("连接网络"), "wifi");
     authRow->addWidget(password, 1);
     authRow->addWidget(connectButton);
     networkLayout->addLayout(authRow);
     wifiStatus = UiKit::label(QString(), "muted");
     networkLayout->addWidget(wifiStatus);
-    tabs->addTab(networkPage, QStringLiteral("网络连接"));
+    I18n::addTab(tabs, networkPage, QStringLiteral("网络连接"));
     auto *displayPage = new QWidget;
     auto *displayLayout = new QVBoxLayout(displayPage);
     displayLayout->setContentsMargins(16, 18, 16, 12);
     displayLayout->setSpacing(14);
-    auto *night = new QCheckBox(QStringLiteral("夜间模式"));
+    auto *night = new QCheckBox;
+    I18n::setText(night, QStringLiteral("夜间模式"));
     night->setChecked(QSettings().value("display/night", false).toBool());
-    auto *large = new QCheckBox(QStringLiteral("大字模式"));
+    auto *large = new QCheckBox;
+    I18n::setText(large, QStringLiteral("大字模式"));
     large->setChecked(QSettings().value("display/large", false).toBool());
     displayLayout->addWidget(night);
     displayLayout->addWidget(large);
@@ -100,18 +124,19 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
                                      : 100);
     }
     brightness->setEnabled(maximum > 0);
-    brightnessStatus->setText(maximum > 0 ? QStringLiteral("调整设备背光")
-                                          : QStringLiteral("当前设备未提供可调背光"));
-    connect(
-        brightness, &QSlider::sliderReleased, this,
-        [brightness, brightnessStatus, backlight, maximum]() {
-            QFile file(backlight + "/brightness");
-            if (!file.open(QIODevice::WriteOnly) ||
-                file.write(QByteArray::number(qMax(1, maximum * brightness->value() / 100))) < 0)
-                brightnessStatus->setText(QStringLiteral("亮度设置失败，请检查背光权限"));
-            else
-                brightnessStatus->setText(QStringLiteral("屏幕亮度 %1%").arg(brightness->value()));
-        });
+    I18n::setText(brightnessStatus, maximum > 0 ? QStringLiteral("调整设备背光")
+                                                : QStringLiteral("当前设备未提供可调背光"));
+    connect(brightness, &QSlider::sliderReleased, this,
+            [brightness, brightnessStatus, backlight, maximum]() {
+                QFile file(backlight + "/brightness");
+                if (!file.open(QIODevice::WriteOnly) ||
+                    file.write(QByteArray::number(qMax(1, maximum * brightness->value() / 100))) <
+                        0)
+                    I18n::setText(brightnessStatus, QStringLiteral("亮度设置失败，请检查背光权限"));
+                else
+                    I18n::setText(brightnessStatus,
+                                  QStringLiteral("屏幕亮度 %1%").arg(brightness->value()));
+            });
     auto theme = [night, large]() {
         QSettings s;
         s.setValue("display/night", night->isChecked());
@@ -122,14 +147,15 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     connect(large, &QCheckBox::toggled, this, [theme](bool) { theme(); });
     connect(volumeSlider, &QSlider::valueChanged, this, &SettingWindow::volumeRequested);
     displayLayout->addStretch();
-    tabs->addTab(displayPage, QStringLiteral("显示与声音"));
+    I18n::addTab(tabs, displayPage, QStringLiteral("显示与声音"));
     auto *devicePage = new QWidget;
     auto *deviceLayout = new QVBoxLayout(devicePage);
     deviceLayout->setContentsMargins(16, 18, 16, 12);
     deviceLayout->setSpacing(16);
     auto *positionRow = new QHBoxLayout;
     gnssStatus = UiKit::label(gnss->status());
-    auto *gnssToggle = new QCheckBox(QStringLiteral("开启 GNSS 定位"));
+    auto *gnssToggle = new QCheckBox;
+    I18n::setText(gnssToggle, QStringLiteral("开启 GNSS 定位"));
     gnssToggle->setChecked(gnss->isEnabled());
     positionRow->addWidget(gnssToggle);
     positionRow->addStretch();
@@ -137,7 +163,7 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     deviceLayout->addLayout(positionRow);
     connect(gnssToggle, &QCheckBox::toggled, gnss, &GnssService::setEnabled);
     connect(gnss, &GnssService::updated, this, [this, gnssToggle]() {
-        gnssStatus->setText(gnss->status());
+        I18n::setText(gnssStatus, gnss->status());
         QSignalBlocker block(gnssToggle);
         gnssToggle->setChecked(gnss->isEnabled());
     });
@@ -151,7 +177,7 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     deviceLayout->addStretch();
     deviceLayout->addWidget(UiKit::label(
         QStringLiteral("目标平台  NXP i.MX6ULL   ·   显示  1024 × 600   ·   Qt Widgets"), "muted"));
-    tabs->addTab(devicePage, QStringLiteral("设备状态"));
+    I18n::addTab(tabs, devicePage, QStringLiteral("设备状态"));
     auto *timePage = new QWidget;
     auto *timeLayout = new QVBoxLayout(timePage);
     timeLayout->setContentsMargins(16, 18, 16, 12);
@@ -171,12 +197,12 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     timeStatus->setWordWrap(true);
     timeLayout->addWidget(timeStatus);
     timeLayout->addStretch();
-    tabs->addTab(timePage, QStringLiteral("日期时间"));
+    I18n::addTab(tabs, timePage, QStringLiteral("日期时间"));
     connect(applyButton, &QPushButton::clicked, this,
             [this, datetime]() { clock->setTime(datetime->dateTime()); });
     connect(syncButton, &QPushButton::clicked, clock, &TimeService::sync);
     connect(clock, &TimeService::status, this, [this](QString text, bool busy) {
-        timeStatus->setText(text);
+        I18n::setText(timeStatus, text);
         applyButton->setEnabled(!busy);
         syncButton->setEnabled(!busy);
     });
@@ -186,13 +212,14 @@ SettingWindow::SettingWindow(GnssService *service, QWidget *parent)
     connect(connectButton, &QPushButton::clicked, this, [this]() {
         auto *item = networks->currentItem();
         if (!item) {
-            wifiStatus->setText(QStringLiteral("请先选择一个网络"));
+            I18n::setText(wifiStatus, QStringLiteral("请先选择一个网络"));
             return;
         }
         wifi->connectNetwork(item->data(Qt::UserRole).toString(), password->text());
         password->clear();
     });
     connect(wifi, &WifiService::updated, this, &SettingWindow::renderWifi);
+    connect(&I18n::instance(), &I18n::languageChanged, this, &SettingWindow::renderWifi);
     refresh.setInterval(5000);
     connect(&refresh, &QTimer::timeout, this, &SettingWindow::renderSystem);
     renderWifi();
@@ -203,7 +230,7 @@ void SettingWindow::setVolume(int value) {
     volumeSlider->setValue(value);
 }
 void SettingWindow::renderWifi() {
-    wifiStatus->setText(wifi->status());
+    I18n::setText(wifiStatus, wifi->status());
     for (auto *button : {scanButton, connectButton, onButton, offButton})
         button->setEnabled(!wifi->busy());
     if (wifi->busy())
@@ -214,20 +241,22 @@ void SettingWindow::renderWifi() {
     networks->clear();
     for (const auto &network : wifi->networks()) {
         const bool online = network.state == "online" || network.state == "ready";
-        auto *item = new QListWidgetItem(QString("%1    %2%  %3")
-                                             .arg(network.name)
-                                             .arg(network.strength)
-                                             .arg(online ? QStringLiteral("已连接") : QString()),
-                                         networks);
+        auto *item = new QListWidgetItem(
+            QString("%1    %2%  %3")
+                .arg(network.name.isEmpty() ? I18n::instance().text(QStringLiteral("隐藏网络"))
+                                            : network.name)
+                .arg(network.strength)
+                .arg(online ? I18n::instance().text(QStringLiteral("已连接")) : QString()),
+            networks);
         item->setData(Qt::UserRole, network.path);
         if (network.path == selected)
             networks->setCurrentItem(item);
     }
 }
 void SettingWindow::renderSystem() {
-    memory->setText(QStringLiteral("内存    ") + SystemStatus::memory());
-    storage->setText(QStringLiteral("存储    ") + SystemStatus::storage());
-    uptime->setText(QStringLiteral("运行时间    ") + SystemStatus::uptime());
+    I18n::setText(memory, QStringLiteral("内存    %1").arg(SystemStatus::memory()));
+    I18n::setText(storage, QStringLiteral("存储    %1").arg(SystemStatus::storage()));
+    I18n::setText(uptime, QStringLiteral("运行时间    %1").arg(SystemStatus::uptime()));
 }
 void SettingWindow::showEvent(QShowEvent *event) {
     QMainWindow::showEvent(event);

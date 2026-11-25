@@ -15,6 +15,9 @@ public:
     explicit MusicPlayer(QWidget *parent = nullptr);
     void ScanLocalSongs();
     QString currentTitle() const;
+    bool hasTracks() const {
+        return !tracks.isEmpty();
+    }
     bool isPlaying() const {
         return player.state() == QMediaPlayer::PlayingState;
     }

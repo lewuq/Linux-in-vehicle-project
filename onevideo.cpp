@@ -1,4 +1,5 @@
 #include "onevideo.h"
+#include "Core/i18n.h"
 #include "Ui/uikit.h"
 #include <QHBoxLayout>
 #include <QListWidget>
@@ -68,9 +69,9 @@ OneVideo::OneVideo(QWidget *parent) : QWidget(parent), library(this) {
             list->addItem(track.title);
         current = -1;
         scanButton->setEnabled(true);
-        status->setText(tracks.isEmpty()
-                            ? QStringLiteral("暂无视频 · 将视频放入配置目录或插入 SD 卡")
-                            : QStringLiteral("共 %1 个本地视频").arg(tracks.size()));
+        I18n::setText(status, tracks.isEmpty()
+                                  ? QStringLiteral("暂无视频 · 将视频放入配置目录或插入 SD 卡")
+                                  : QStringLiteral("共 %1 个本地视频").arg(tracks.size()));
     });
     connect(scanButton, &QPushButton::clicked, this, &OneVideo::ScanLocalVideos);
     connect(list, &QListWidget::itemClicked, this,
@@ -90,7 +91,7 @@ OneVideo::OneVideo(QWidget *parent) : QWidget(parent), library(this) {
     connect(&player, &QMediaPlayer::positionChanged, this, [this](qint64 value) {
         if (!seek->isSliderDown())
             seek->setValue(int(value / 1000));
-        time->setText(durationText(value) + " / " + durationText(player.duration()));
+        I18n::setText(time, durationText(value) + " / " + durationText(player.duration()));
     });
     connect(seek, &QSlider::sliderReleased, this,
             [this]() { player.setPosition(qint64(seek->value()) * 1000); });
@@ -106,7 +107,7 @@ OneVideo::OneVideo(QWidget *parent) : QWidget(parent), library(this) {
             });
     connect(&player, QOverload<QMediaPlayer::Error>::of(&QMediaPlayer::error), this,
             [this](QMediaPlayer::Error) {
-                status->setText(QStringLiteral("播放失败：%1").arg(player.errorString()));
+                I18n::setText(status, QStringLiteral("播放失败：%1").arg(player.errorString()));
             });
     ScanLocalVideos();
 }
@@ -122,7 +123,7 @@ void OneVideo::select(int index, bool start) {
     if (index < 0 || index >= tracks.size())
         return;
     current = index;
-    title->setText(tracks[index].title);
+    I18n::setLiteralText(title, tracks[index].title);
     list->setCurrentRow(index);
     player.setMedia(QUrl::fromLocalFile(tracks[index].path));
     if (start)
@@ -130,7 +131,7 @@ void OneVideo::select(int index, bool start) {
 }
 void OneVideo::play() {
     if (tracks.isEmpty()) {
-        status->setText(QStringLiteral("没有可播放的视频"));
+        I18n::setText(status, QStringLiteral("没有可播放的视频"));
         return;
     }
     if (current < 0)
@@ -148,6 +149,6 @@ void OneVideo::onPrevVideo() {
 }
 void OneVideo::updateControls() {
     const bool playing = player.state() == QMediaPlayer::PlayingState;
-    playButton->setText(playing ? QStringLiteral("暂停") : QStringLiteral("播放"));
+    I18n::setText(playButton, playing ? QStringLiteral("暂停") : QStringLiteral("播放"));
     playButton->setIcon(UiKit::icon(playing ? "pause" : "play"));
 }

@@ -17,6 +17,7 @@
 ## Features
 
 - One native window, persistent navigation and pages created on demand.
+- Live Simplified Chinese / English switching in Settings. Chinese is the first-run default; language preference is saved without recreating pages or interrupting playback.
 - Local/SD music, favorites, playback modes, seeking, playback memory and isolated streaming downloads.
 - Local video with playback/volume controls and automatic pause when leaving the page.
 - GNSS GGA/RMC parsing, checksum validation, WGS84 map requests and saved locations.
@@ -74,6 +75,7 @@ an explicitly empty `QT_IM_MODULE` disables it. An optional [systemd unit](deplo
 ## Project structure
 
 `Core/` contains services and models; `Ui/` holds the shared theme and icons. `Map/`, `Monitor/`, `Music/` and `Weather/` contain the feature pages.
+`Translations/` contains the interface translation catalog.
 `tests/` holds regression tests, `scripts/` and `deploy/` provide deployment examples, and `docs/` contains badges and screenshots.
 
 ## Tests

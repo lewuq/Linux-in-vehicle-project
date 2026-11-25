@@ -1,4 +1,5 @@
 #include "uikit.h"
+#include "Core/i18n.h"
 #include <QApplication>
 #include <QFile>
 #include <QPainter>
@@ -169,13 +170,16 @@ QIcon UiKit::icon(const QString &name, const QColor &color, int size) {
     return QIcon(image);
 }
 QLabel *UiKit::label(const QString &text, const char *role, QWidget *parent) {
-    auto *item = new QLabel(text, parent);
+    auto *item = new QLabel(parent);
+    if (!text.isEmpty())
+        I18n::setText(item, text);
     item->setProperty("role", role);
     item->setTextFormat(Qt::PlainText);
     return item;
 }
 QPushButton *UiKit::button(const QString &text, const QString &name, QWidget *parent) {
-    auto *item = new QPushButton(text, parent);
+    auto *item = new QPushButton(parent);
+    I18n::setText(item, text);
     item->setMinimumHeight(48);
     item->setCursor(Qt::PointingHandCursor);
     if (!name.isEmpty()) {

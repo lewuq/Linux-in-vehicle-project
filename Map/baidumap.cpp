@@ -1,6 +1,7 @@
 #include "baidumap.h"
 #include "Core/appconfig.h"
 #include "Core/gnssservice.h"
+#include "Core/i18n.h"
 #include "Core/network.h"
 #include "Ui/uikit.h"
 #include <QHBoxLayout>
@@ -19,7 +20,7 @@ BaiduMap::BaiduMap(GnssService *service, QWidget *parent) : QMainWindow(parent),
     row->addWidget(UiKit::label(QStringLiteral("地图与位置"), "title"));
     row->addStretch();
     search = new QLineEdit;
-    search->setPlaceholderText(QStringLiteral("搜索城市或地点"));
+    I18n::setProperty(search, "placeholderText", QStringLiteral("搜索城市或地点"));
     search->setMaximumWidth(220);
     auto *go = UiKit::button(QStringLiteral("查看"), "pin");
     auto *locate = UiKit::button(QStringLiteral("我的位置"), "map");
@@ -69,13 +70,13 @@ BaiduMap::BaiduMap(GnssService *service, QWidget *parent) : QMainWindow(parent),
         QSettings s;
         s.setValue("map/bookmark", center);
         s.setValue("map/bookmarkFix", usingFix);
-        status->setText(QStringLiteral("地点已保存"));
+        I18n::setText(status, QStringLiteral("地点已保存"));
     });
     connect(home, &QPushButton::clicked, this, [this]() {
         QSettings s;
         center = s.value("map/bookmark").toString();
         if (center.isEmpty()) {
-            status->setText(QStringLiteral("尚未保存地点"));
+            I18n::setText(status, QStringLiteral("尚未保存地点"));
             return;
         }
         usingFix = s.value("map/bookmarkFix", false).toBool();
@@ -86,11 +87,11 @@ BaiduMap::BaiduMap(GnssService *service, QWidget *parent) : QMainWindow(parent),
 }
 void BaiduMap::updateFix() {
     const auto fix = gnss->fix();
-    coordinates->setText(fix.valid ? QStringLiteral("WGS84  %1, %2 · %3")
-                                         .arg(fix.latitude, 0, 'f', 6)
-                                         .arg(fix.longitude, 0, 'f', 6)
-                                         .arg(gnss->status())
-                                   : gnss->status());
+    I18n::setText(coordinates, fix.valid ? QStringLiteral("WGS84  %1, %2 · %3")
+                                               .arg(fix.latitude, 0, 'f', 6)
+                                               .arg(fix.longitude, 0, 'f', 6)
+                                               .arg(gnss->status())
+                                         : gnss->status());
 }
 void BaiduMap::zoomIn() {
     zoom = qMin(18, zoom + 1);
@@ -104,7 +105,7 @@ void BaiduMap::requestMap(bool useFix) {
     if (useFix) {
         const auto fix = gnss->fix();
         if (!fix.valid) {
-            status->setText(QStringLiteral("尚未获得有效定位"));
+            I18n::setText(status, QStringLiteral("尚未获得有效定位"));
             return;
         }
         center = QString("%1,%2").arg(fix.longitude, 0, 'f', 6).arg(fix.latitude, 0, 'f', 6);
@@ -115,7 +116,7 @@ void BaiduMap::requestMap(bool useFix) {
         return;
     const QString key = AppConfig::value("map/api_key");
     if (key.isEmpty()) {
-        status->setText(QStringLiteral("地图服务未启用"));
+        I18n::setText(status, QStringLiteral("地图服务未启用"));
         return;
     }
     if (active) {
@@ -139,7 +140,7 @@ void BaiduMap::requestMap(bool useFix) {
     auto *reply = network.get(request);
     active = reply;
     Network::setTimeout(reply);
-    status->setText(QStringLiteral("正在加载地图…"));
+    I18n::setText(status, QStringLiteral("正在加载地图…"));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (active != reply)
@@ -147,10 +148,11 @@ void BaiduMap::requestMap(bool useFix) {
         active = nullptr;
         QPixmap pix;
         if (reply->error() != QNetworkReply::NoError || !pix.loadFromData(reply->readAll())) {
-            status->setText(QStringLiteral("地图加载失败，请检查网络或服务配置"));
+            I18n::setText(status, QStringLiteral("地图加载失败，请检查网络或服务配置"));
             return;
         }
-        image->setPixmap(pix.scaled(image->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-        status->setText(QStringLiteral("%1 · 缩放 %2").arg(center).arg(zoom));
+        I18n::setPixmap(image,
+                        pix.scaled(image->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        I18n::setText(status, QStringLiteral("%1 · 缩放 %2").arg(center).arg(zoom));
     });
 }

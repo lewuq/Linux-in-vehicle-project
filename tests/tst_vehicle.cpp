@@ -1,5 +1,6 @@
 #include "Core/commandrunner.h"
 #include "Core/downloadservice.h"
+#include "Core/i18n.h"
 #include "Core/medialibrary.h"
 #include "Core/speechservice.h"
 #include "Core/weatherservice.h"
@@ -11,9 +12,11 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSettings>
 #include <QStackedWidget>
+#include <QTabWidget>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -220,6 +223,93 @@ private slots:
         library.scan("music");
         QTRY_COMPARE(completions, 2);
     }
+
+    void languageDefaultsToChinese() {
+        QSettings().remove("display/language");
+        I18n::instance().initialize();
+        QCOMPARE(I18n::instance().language(), QString("zh_CN"));
+        QCOMPARE(I18n::instance().text(QStringLiteral("设置中心")), QStringLiteral("设置中心"));
+    }
+    void languageBindsExistingAndNewWidgets() {
+        auto *label = UiKit::label(QStringLiteral("正在下载 %1").arg(QStringLiteral("首页%1")));
+        QLineEdit input;
+        I18n::setProperty(&input, "placeholderText", QStringLiteral("搜索城市或地点"));
+        I18n::instance().setLanguage("en_US");
+        QCOMPARE(label->text(), QStringLiteral("Downloading 首页%1"));
+        QCOMPARE(input.placeholderText(), QString("Search a city or place"));
+        auto *button = UiKit::button(QStringLiteral("扫描网络"));
+        QCOMPARE(button->text(), QString("Scan networks"));
+        QCOMPARE(I18n::instance().text(QStringLiteral("内存    当前平台不提供内存数据")),
+                 QString("Memory    Memory data unavailable on this platform"));
+        I18n::instance().setLanguage("zh_CN");
+        QCOMPARE(label->text(), QStringLiteral("正在下载 首页%1"));
+        QCOMPARE(button->text(), QStringLiteral("扫描网络"));
+        delete label;
+        delete button;
+    }
+    void languagePreservesMediaAndImages() {
+        QLabel title;
+        I18n::setText(&title, QStringLiteral("选择一个视频"));
+        I18n::setLiteralText(&title, QStringLiteral("首页"));
+        QLabel image;
+        I18n::setText(&image, QStringLiteral("等待摄像头"));
+        QPixmap frame(24, 24);
+        frame.fill(Qt::green);
+        I18n::setPixmap(&image, frame);
+        I18n::instance().setLanguage("en_US");
+        QCOMPARE(title.text(), QStringLiteral("首页"));
+        QCOMPARE(image.pixmap(Qt::ReturnByValue).size(), QSize(24, 24));
+        I18n::instance().setLanguage("zh_CN");
+        QCOMPARE(image.pixmap(Qt::ReturnByValue).size(), QSize(24, 24));
+    }
+    void languagePersistsAndRejectsInvalidPreference() {
+        I18n::instance().setLanguage("en_US");
+        QCOMPARE(QSettings().value("display/language").toString(), QString("en_US"));
+        I18n::instance().initialize();
+        QCOMPARE(I18n::instance().language(), QString("en_US"));
+        QSettings().setValue("display/language", "unsupported");
+        I18n::instance().initialize();
+        QCOMPARE(I18n::instance().language(), QString("zh_CN"));
+        QSettings().remove("display/language");
+    }
+    void settingsSwitchLanguageWithoutRecreatingPages() {
+        MainWindow window;
+        window.setFixedSize(1024, 600);
+        window.show();
+        window.openPage(6);
+        auto *stack = window.findChild<QStackedWidget *>();
+        QWidget *settings = stack->currentWidget();
+        auto *english = window.findChild<QPushButton *>("languageEnglish");
+        auto *chinese = window.findChild<QPushButton *>("languageChinese");
+        QVERIFY(english && chinese);
+        auto *tabs = settings->findChild<QTabWidget *>();
+        auto *password = settings->findChild<QLineEdit *>("wifiPassword");
+        QVERIFY(password);
+        password->setText("unmodified-input");
+        QTest::mouseClick(english, Qt::LeftButton);
+        QCOMPARE(stack->currentWidget(), settings);
+        QCOMPARE(tabs->tabText(0), QString("Network"));
+        QCOMPARE(password->placeholderText(), QString("Password for selected network"));
+        QCOMPARE(password->text(), QString("unmodified-input"));
+        QVERIFY(english->isChecked());
+        QCOMPARE(window.findChild<QPushButton *>("nav_home")->accessibleName(), QString("Home"));
+        const int pageCount = stack->count();
+        window.openPage(4);
+        bool translatedWeather = false;
+        for (auto *label : stack->currentWidget()->findChildren<QLabel *>())
+            translatedWeather |= label->text() == "Weather ahead";
+        QVERIFY(translatedWeather);
+        window.openPage(6);
+        QTest::mouseClick(chinese, Qt::LeftButton);
+        QCOMPARE(stack->currentWidget(), settings);
+        QCOMPARE(stack->count(), pageCount + 1);
+        QCOMPARE(tabs->tabText(0), QStringLiteral("网络连接"));
+        QCOMPARE(password->text(), QString("unmodified-input"));
+        QVERIFY(chinese->isChecked());
+        QCOMPARE(window.findChild<QPushButton *>("nav_home")->accessibleName(),
+                 QStringLiteral("首页"));
+    }
+
     void shellLazyLoadsAndKeepsNavigation() {
         MainWindow window;
         window.setFixedSize(1024, 600);

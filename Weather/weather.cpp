@@ -1,4 +1,5 @@
 #include "weather.h"
+#include "Core/i18n.h"
 #include "Core/weatherservice.h"
 #include "Ui/uikit.h"
 #include <QHBoxLayout>
@@ -26,7 +27,7 @@ Weather::Weather(WeatherService *weatherService, QWidget *parent)
     header->addStretch();
     cityInput = new QLineEdit;
     cityInput->setMaximumWidth(160);
-    cityInput->setPlaceholderText(QStringLiteral("输入城市"));
+    I18n::setProperty(cityInput, "placeholderText", QStringLiteral("输入城市"));
     auto *change = UiKit::button(QStringLiteral("切换城市"), "pin");
     refreshButton = UiKit::button(QStringLiteral("刷新"), "refresh");
     header->addWidget(cityInput);
@@ -47,7 +48,7 @@ Weather::Weather(WeatherService *weatherService, QWidget *parent)
     heroRow->addLayout(info, 1);
     image = UiKit::label(QString());
     image->setAlignment(Qt::AlignCenter);
-    image->setPixmap(UiKit::icon("weather", QColor("#8a9b78"), 120).pixmap(120, 120));
+    I18n::setPixmap(image, UiKit::icon("weather", QColor("#8a9b78"), 120).pixmap(120, 120));
     heroRow->addWidget(image, 1);
     root->addWidget(hero, 1);
     auto *forecast = new QHBoxLayout;
@@ -74,43 +75,45 @@ Weather::Weather(WeatherService *weatherService, QWidget *parent)
     connect(cityInput, &QLineEdit::returnPressed, this,
             [this]() { service->setCity(cityInput->text()); });
     connect(service, &WeatherService::updated, this, &Weather::render);
+    connect(&I18n::instance(), &I18n::languageChanged, this, &Weather::render);
     render();
     service->refresh();
 }
 void Weather::render() {
     const auto &report = service->report();
-    status->setText(service->status());
+    I18n::setText(status, service->status());
     refreshButton->setEnabled(!service->busy());
     if (report.days.isEmpty()) {
-        city->setText(QStringLiteral("等待天气数据"));
-        temperature->setText("--°");
-        description->setText(QStringLiteral("暂无实况"));
+        I18n::setText(city, QStringLiteral("等待天气数据"));
+        I18n::setText(temperature, "--°");
+        I18n::setText(description, QStringLiteral("暂无实况"));
         for (int i = 0; i < dates.size(); ++i) {
-            dates[i]->setText(i == 0 ? QStringLiteral("今天") : QStringLiteral("--"));
+            I18n::setText(dates[i], i == 0 ? QStringLiteral("今天") : QStringLiteral("--"));
             icons[i]->clear();
-            temperatures[i]->setText("-- / --");
-            descriptions[i]->setText(QStringLiteral("暂无预报"));
+            I18n::setText(temperatures[i], "-- / --");
+            I18n::setText(descriptions[i], QStringLiteral("暂无预报"));
         }
         return;
     }
-    city->setText(report.city);
+    I18n::setLiteralText(city, report.city);
     const auto &today = report.days.first();
-    temperature->setText(today.high + "°");
-    description->setText(today.description + " · " + today.wind);
-    image->setPixmap(weatherIcon(today.icon, 128));
-    QLocale locale(QLocale::Chinese, QLocale::China);
+    I18n::setText(temperature, today.high + "°");
+    I18n::setText(description, today.description + " · " + today.wind);
+    I18n::setPixmap(image, weatherIcon(today.icon, 128));
+    const QLocale locale = I18n::instance().locale();
     for (int i = 0; i < dates.size(); ++i) {
         if (i >= report.days.size()) {
-            dates[i]->setText("--");
+            I18n::setText(dates[i], "--");
             icons[i]->clear();
-            temperatures[i]->setText("-- / --");
-            descriptions[i]->setText(QStringLiteral("暂无预报"));
+            I18n::setText(temperatures[i], "-- / --");
+            I18n::setText(descriptions[i], QStringLiteral("暂无预报"));
             continue;
         }
         const auto &day = report.days[i];
-        dates[i]->setText(i == 0 ? QStringLiteral("今天") : locale.toString(day.date, "ddd MM/dd"));
-        icons[i]->setPixmap(weatherIcon(day.icon, 42));
-        temperatures[i]->setText(day.high + "° / " + day.low + "°");
-        descriptions[i]->setText(day.description);
+        I18n::setText(dates[i],
+                      i == 0 ? QStringLiteral("今天") : locale.toString(day.date, "ddd MM/dd"));
+        I18n::setPixmap(icons[i], weatherIcon(day.icon, 42));
+        I18n::setText(temperatures[i], day.high + "° / " + day.low + "°");
+        I18n::setText(descriptions[i], day.description);
     }
 }

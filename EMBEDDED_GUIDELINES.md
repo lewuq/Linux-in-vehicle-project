@@ -20,6 +20,7 @@
 
 - The application targets 1024 × 600. Preserve at least 48-pixel touch targets for primary controls.
 - Keep interface colors in `Ui/theme.qss` and shared line icons in `Ui/uikit.cpp`.
+- Bind interface text through `Core/i18n.h`; English strings live in `Translations/en_US.json` and Chinese is the first-run default. Literal user data uses `setLiteralText`, and `setPixmap` clears stale placeholder bindings before displaying images.
 - Compressed JPEG and PNG file sizes do not predict decoded pixmap memory use. Measure resident memory on the board.
 - `hide()` does not free a page. Pause video/camera and hidden-page polling explicitly.
 - Keep board-specific device nodes and service credentials in `vehicle.ini` or environment variables.

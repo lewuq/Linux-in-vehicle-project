@@ -96,7 +96,7 @@ void WifiService::refresh() {
                 continue;
             WifiNetwork item;
             item.path = path.path();
-            item.name = properties.value("Name", QStringLiteral("隐藏网络")).toString();
+            item.name = properties.value("Name").toString();
             item.state = properties.value("State").toString();
             item.strength = properties.value("Strength").toInt();
             items.append(item);

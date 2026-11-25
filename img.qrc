@@ -19,4 +19,7 @@
         <file>Weather/images/yun.png</file>
         <file>Weather/images/zhenyu.png</file>
     </qresource>
+    <qresource prefix="/i18n">
+        <file>Translations/en_US.json</file>
+    </qresource>
 </RCC>

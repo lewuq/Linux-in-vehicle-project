@@ -1,4 +1,5 @@
 #include "monitor.h"
+#include "Core/i18n.h"
 #include "Ui/uikit.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -38,13 +39,13 @@ Monitor::Monitor(QWidget *parent) : QMainWindow(parent), capture(this), sensor(t
     });
     connect(&capture, &CaptureThread::imageReady, this, [this](QImage frame) {
         if (wanted) {
-            image->setPixmap(QPixmap::fromImage(frame).scaled(image->size(), Qt::KeepAspectRatio,
-                                                              Qt::FastTransformation));
-            status->setText(QStringLiteral("实时影像"));
+            I18n::setPixmap(image, QPixmap::fromImage(frame).scaled(
+                                       image->size(), Qt::KeepAspectRatio, Qt::FastTransformation));
+            I18n::setText(status, QStringLiteral("实时影像"));
             ++frames;
             if (fpsTimer.elapsed() >= 1000) {
-                fps->setText(
-                    QString("%1 FPS").arg(frames * 1000.0 / fpsTimer.elapsed(), 0, 'f', 1));
+                I18n::setText(
+                    fps, QString("%1 FPS").arg(frames * 1000.0 / fpsTimer.elapsed(), 0, 'f', 1));
                 frames = 0;
                 fpsTimer.restart();
             }
@@ -55,9 +56,9 @@ Monitor::Monitor(QWidget *parent) : QMainWindow(parent), capture(this), sensor(t
         wanted = false;
         timer.stop();
         image->clear();
-        image->setText(error);
-        status->setText(error);
-        toggle->setText(QStringLiteral("重试连接"));
+        I18n::setText(image, error);
+        I18n::setText(status, error);
+        I18n::setText(toggle, QStringLiteral("重试连接"));
     });
     connect(&capture, &QThread::finished, this, [this]() {
         if (wanted)
@@ -66,8 +67,8 @@ Monitor::Monitor(QWidget *parent) : QMainWindow(parent), capture(this), sensor(t
     timer.setInterval(1000);
     connect(&timer, &QTimer::timeout, this, [this]() {
         const QString value = sensor.readPsData();
-        proximity->setText(value.isEmpty() ? QStringLiteral("接近度传感器不可用")
-                                           : QStringLiteral("接近度原始值 %1").arg(value));
+        I18n::setText(proximity, value.isEmpty() ? QStringLiteral("接近度传感器不可用")
+                                                 : QStringLiteral("接近度原始值 %1").arg(value));
     });
 }
 Monitor::~Monitor() {
@@ -80,8 +81,8 @@ void Monitor::myStart() {
     wanted = true;
     frames = 0;
     fpsTimer.start();
-    status->setText(QStringLiteral("正在连接摄像头…"));
-    toggle->setText(QStringLiteral("停止影像"));
+    I18n::setText(status, QStringLiteral("正在连接摄像头…"));
+    I18n::setText(toggle, QStringLiteral("停止影像"));
     timer.start();
     capture.startThread();
 }
@@ -89,7 +90,7 @@ void Monitor::myStop() {
     wanted = false;
     timer.stop();
     capture.stopThread();
-    fps->setText("-- FPS");
-    status->setText(QStringLiteral("影像已暂停"));
-    toggle->setText(QStringLiteral("启动影像"));
+    I18n::setText(fps, "-- FPS");
+    I18n::setText(status, QStringLiteral("影像已暂停"));
+    I18n::setText(toggle, QStringLiteral("启动影像"));
 }

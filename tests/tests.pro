@@ -57,3 +57,6 @@ HEADERS += ../speechrecognition.h
 HEADERS += ../Ui/uikit.h
 HEADERS += ../Weather/weather.h
 RESOURCES += ../img.qrc
+
+SOURCES += ../Core/i18n.cpp
+HEADERS += ../Core/i18n.h

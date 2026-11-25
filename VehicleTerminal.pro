@@ -67,3 +67,6 @@ unix:!android {
     target.path = /opt/vehicle-terminal
     INSTALLS += target
 }
+
+SOURCES += Core/i18n.cpp
+HEADERS += Core/i18n.h

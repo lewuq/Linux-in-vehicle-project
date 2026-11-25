@@ -1,4 +1,5 @@
 #include "musicplayer.h"
+#include "Core/i18n.h"
 #include "Ui/uikit.h"
 #include "searchmusic.h"
 #include <QHBoxLayout>
@@ -37,7 +38,7 @@ MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), 
     artLayout->setContentsMargins(20, 12, 20, 12);
     auto *disc = UiKit::label(QString(), "body");
     disc->setAlignment(Qt::AlignCenter);
-    disc->setPixmap(UiKit::icon("music", QColor("#8a9b78"), 48).pixmap(48, 48));
+    I18n::setPixmap(disc, UiKit::icon("music", QColor("#8a9b78"), 48).pixmap(48, 48));
     disc->setFixedHeight(50);
     artLayout->addStretch();
     artLayout->addWidget(disc);
@@ -120,11 +121,12 @@ MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), 
             player.setPosition(previousPosition);
         if (wasPlaying)
             player.play();
-        status->setText(tracks.isEmpty()
-                            ? QStringLiteral("暂无音乐 · 将音频放入配置的音乐目录或插入 SD 卡")
-                            : QStringLiteral("共 %1 首音乐 · 收藏 %2 首")
-                                  .arg(tracks.size())
-                                  .arg(favorites.size()));
+        I18n::setText(status,
+                      tracks.isEmpty()
+                          ? QStringLiteral("暂无音乐 · 将音频放入配置的音乐目录或插入 SD 卡")
+                          : QStringLiteral("共 %1 首音乐 · 收藏 %2 首")
+                                .arg(tracks.size())
+                                .arg(favorites.size()));
         updateCurrent();
     });
     connect(list, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
@@ -145,13 +147,15 @@ MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), 
         search->show();
         search->raise();
     });
-    connect(&downloads, &DownloadService::status, status, &QLabel::setText);
+    connect(&downloads, &DownloadService::status, this,
+            [this](const QString &text) { I18n::setText(status, text); });
     connect(&downloads, &DownloadService::saved, this, [this](QString) { ScanLocalSongs(); });
     connect(playButton, &QPushButton::clicked, this, &MusicPlayer::togglePlayback);
     connect(prev, &QPushButton::clicked, this, &MusicPlayer::previous);
     connect(nextButton, &QPushButton::clicked, this, &MusicPlayer::next);
     connect(filterButton, &QPushButton::toggled, this, [this](bool checked) {
-        filterButton->setText(checked ? QStringLiteral("我的收藏") : QStringLiteral("全部音乐"));
+        I18n::setText(filterButton,
+                      checked ? QStringLiteral("我的收藏") : QStringLiteral("全部音乐"));
         rebuildList();
     });
     connect(favoriteButton, &QPushButton::clicked, this, &MusicPlayer::toggleFavorite);
@@ -161,9 +165,9 @@ MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), 
                           : current == QMediaPlaylist::Random ? QMediaPlaylist::CurrentItemInLoop
                                                               : QMediaPlaylist::Loop;
         playlist.setPlaybackMode(mode);
-        modeButton->setText(mode == QMediaPlaylist::Loop     ? QStringLiteral("列表循环")
-                            : mode == QMediaPlaylist::Random ? QStringLiteral("随机播放")
-                                                             : QStringLiteral("单曲循环"));
+        I18n::setText(modeButton, mode == QMediaPlaylist::Loop     ? QStringLiteral("列表循环")
+                                  : mode == QMediaPlaylist::Random ? QStringLiteral("随机播放")
+                                                                   : QStringLiteral("单曲循环"));
     });
     connect(&playlist, &QMediaPlaylist::currentIndexChanged, this,
             [this](int) { updateCurrent(); });
@@ -180,7 +184,7 @@ MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), 
     connect(&player, &QMediaPlayer::positionChanged, this, [this](qint64 position) {
         if (!seek->isSliderDown())
             seek->setValue(int(position / 1000));
-        time->setText(timestamp(position) + " / " + timestamp(player.duration()));
+        I18n::setText(time, timestamp(position) + " / " + timestamp(player.duration()));
     });
     connect(seek, &QSlider::sliderReleased, this,
             [this]() { player.setPosition(qint64(seek->value()) * 1000); });
@@ -194,7 +198,7 @@ MusicPlayer::MusicPlayer(QWidget *parent) : QMainWindow(parent), library(this), 
             });
     connect(&player, QOverload<QMediaPlayer::Error>::of(&QMediaPlayer::error), this,
             [this](QMediaPlayer::Error) {
-                status->setText(QStringLiteral("播放失败：%1").arg(player.errorString()));
+                I18n::setText(status, QStringLiteral("播放失败：%1").arg(player.errorString()));
             });
     auto *saveTimer = new QTimer(this);
     saveTimer->setInterval(5000);
@@ -218,7 +222,7 @@ void MusicPlayer::ScanLocalSongs() {
         return;
     }
     scanButton->setEnabled(false);
-    status->setText(QStringLiteral("正在扫描媒体…"));
+    I18n::setText(status, QStringLiteral("正在扫描媒体…"));
     library.scan("music");
 }
 void MusicPlayer::rebuildList() {
@@ -237,13 +241,16 @@ void MusicPlayer::rebuildList() {
     }
 }
 void MusicPlayer::updateCurrent() {
-    title->setText(currentTitle());
-    playButton->setText(isPlaying() ? QStringLiteral("暂停") : QStringLiteral("播放"));
+    if (tracks.isEmpty())
+        I18n::setText(title, currentTitle());
+    else
+        I18n::setLiteralText(title, currentTitle());
+    I18n::setText(playButton, isPlaying() ? QStringLiteral("暂停") : QStringLiteral("播放"));
     playButton->setIcon(UiKit::icon(isPlaying() ? "pause" : "play"));
     const QString path = playlist.currentMedia().request().url().toLocalFile();
     favoriteButton->setChecked(favorites.contains(path));
-    favoriteButton->setText(favorites.contains(path) ? QStringLiteral("已收藏")
-                                                     : QStringLiteral("加入收藏"));
+    I18n::setText(favoriteButton,
+                  favorites.contains(path) ? QStringLiteral("已收藏") : QStringLiteral("加入收藏"));
     favoriteButton->setEnabled(!path.isEmpty());
     emit nowPlayingChanged(currentTitle(), isPlaying());
 }

@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "Core/gnssservice.h"
+#include "Core/i18n.h"
 #include "Core/speechservice.h"
 #include "Core/systemstatus.h"
 #include "Core/weatherservice.h"
@@ -48,7 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
     nav->setSpacing(5);
     auto *brand = UiKit::label(QString());
     brand->setAlignment(Qt::AlignCenter);
-    brand->setPixmap(UiKit::icon("car", QColor("#53665b"), 30).pixmap(30, 30));
+    I18n::setPixmap(brand, UiKit::icon("car", QColor("#53665b"), 30).pixmap(30, 30));
     nav->addWidget(brand);
     nav->addSpacing(14);
     for (int i = 0; i < names.size(); ++i) {
@@ -57,12 +58,12 @@ MainWindow::MainWindow(QWidget *parent)
         button->setProperty("nav", true);
         button->setCheckable(true);
         button->setFixedSize(64, 60);
-        button->setAccessibleName(names[i]);
+        I18n::setProperty(button, "accessibleName", names[i]);
         auto *column = new QVBoxLayout(button);
         column->setContentsMargins(2, 4, 2, 4);
         column->setSpacing(2);
         auto *icon = UiKit::label(QString());
-        icon->setPixmap(UiKit::icon(symbols[i]).pixmap(24, 24));
+        I18n::setPixmap(icon, UiKit::icon(symbols[i]).pixmap(24, 24));
         icon->setAlignment(Qt::AlignCenter);
         auto *text = UiKit::label(names[i], "muted");
         text->setAlignment(Qt::AlignCenter);
@@ -104,7 +105,7 @@ MainWindow::MainWindow(QWidget *parent)
     auto *footerLayout = new QHBoxLayout(footer);
     footerLayout->setContentsMargins(4, 10, 4, 10);
     auto *note = UiKit::label(QString());
-    note->setPixmap(UiKit::icon("music").pixmap(24, 24));
+    I18n::setPixmap(note, UiKit::icon("music").pixmap(24, 24));
     footerLayout->addWidget(note);
     footerSong = UiKit::label(QStringLiteral("音乐，让旅途慢下来"), "muted");
     footerSong->setMaximumWidth(270);
@@ -114,7 +115,7 @@ MainWindow::MainWindow(QWidget *parent)
     footerLayout->addWidget(footerPlay);
     auto *volume = UiKit::button(QString(), "volume");
     volume->setCheckable(true);
-    volume->setToolTip(QStringLiteral("静音 / 恢复音量"));
+    I18n::setProperty(volume, "toolTip", QStringLiteral("静音 / 恢复音量"));
     footerLayout->addWidget(volume);
     volumeSlider = new QSlider(Qt::Horizontal);
     volumeSlider->setRange(0, 100);
@@ -126,13 +127,14 @@ MainWindow::MainWindow(QWidget *parent)
     voiceLabel->setMaximumWidth(185);
     footerLayout->addWidget(voiceLabel);
     auto *mic = UiKit::button(QString(), "mic");
-    mic->setToolTip(QStringLiteral("按住录音，松开识别"));
+    I18n::setProperty(mic, "toolTip", QStringLiteral("按住录音，松开识别"));
     mic->setObjectName("voiceButton");
     footerLayout->addWidget(mic);
     content->addWidget(footer);
     connect(mic, &QPushButton::pressed, speech, &SpeechService::start);
     connect(mic, &QPushButton::released, speech, &SpeechService::stop);
-    connect(speech, &SpeechService::status, voiceLabel, &QLabel::setText);
+    connect(speech, &SpeechService::status, this,
+            [this](const QString &text) { I18n::setText(voiceLabel, text); });
     connect(speech, &SpeechService::command, this, &MainWindow::handleVoice);
     connect(footerPlay, &QPushButton::clicked, this, [this]() { ensureMusic()->togglePlayback(); });
     connect(volumeSlider, &QSlider::valueChanged, this, [this](int value) {
@@ -152,18 +154,19 @@ MainWindow::MainWindow(QWidget *parent)
             volumeSlider->setValue(volume->property("previous").toInt());
     });
     connect(sensor, &Dht11::updateDht11Data, this, [this](QString humidity, QString temperature) {
-        humidityLabel->setText(humidity + " %");
-        temperatureLabel->setText(temperature + " °C");
-        sensorLabel->setText(QStringLiteral("环境传感器 · 实时"));
+        I18n::setText(humidityLabel, humidity + " %");
+        I18n::setText(temperatureLabel, temperature + " °C");
+        I18n::setText(sensorLabel, QStringLiteral("环境传感器 · 实时"));
     });
     connect(sensor, &Dht11::unavailable, this, [this](QString reason) {
-        temperatureLabel->setText("-- °C");
-        humidityLabel->setText("-- %");
-        sensorLabel->setText(reason);
+        I18n::setText(temperatureLabel, "-- °C");
+        I18n::setText(humidityLabel, "-- %");
+        I18n::setText(sensorLabel, reason);
     });
     sensor->start();
     connect(gnss, &GnssService::updated, this, &MainWindow::updateStatus);
     connect(weather, &WeatherService::updated, this, &MainWindow::updateWeather);
+    connect(&I18n::instance(), &I18n::languageChanged, this, &MainWindow::updateClock);
     ticker.setInterval(1000);
     connect(&ticker, &QTimer::timeout, this, &MainWindow::updateClock);
     ticker.start();
@@ -206,7 +209,7 @@ QWidget *MainWindow::createHome() {
     heroRow->setContentsMargins(24, 18, 16, 18);
     auto *clockColumn = new QVBoxLayout;
     clockColumn->setSpacing(0);
-    clockColumn->addWidget(UiKit::label("YOUR EVERYDAY JOURNEY", "eyebrow"));
+    clockColumn->addWidget(UiKit::label(QStringLiteral("日常旅途，舒适随行"), "eyebrow"));
     clockLabel = UiKit::label(QString(), "hero");
     dateLabel = UiKit::label(QString(), "body");
     clockColumn->addWidget(clockLabel);
@@ -221,7 +224,7 @@ QWidget *MainWindow::createHome() {
     weatherTop->addWidget(UiKit::label(QStringLiteral("沿途天气"), "muted"));
     weatherTop->addStretch();
     weatherImage = UiKit::label(QString());
-    weatherImage->setPixmap(UiKit::icon("weather", QColor("#a89468"), 30).pixmap(30, 30));
+    I18n::setPixmap(weatherImage, UiKit::icon("weather", QColor("#a89468"), 30).pixmap(30, 30));
     weatherTop->addWidget(weatherImage);
     weatherLayout->addLayout(weatherTop);
     weatherLabel = UiKit::label("--°", "metric");
@@ -305,10 +308,17 @@ QWidget *MainWindow::ensurePage(int index) {
         page = music;
         music->setVolume(volumeSlider->value());
         connect(music, &MusicPlayer::nowPlayingChanged, this, [this](QString title, bool playing) {
-            songLabel->setText(title);
-            footerSong->setText(footerSong->fontMetrics().elidedText(title, Qt::ElideRight, 260));
+            if (music->hasTracks()) {
+                I18n::setLiteralText(songLabel, title);
+                I18n::setLiteralText(
+                    footerSong, footerSong->fontMetrics().elidedText(title, Qt::ElideRight, 260));
+            } else {
+                I18n::setText(songLabel, title);
+                I18n::setText(footerSong, title);
+            }
             footerSong->setToolTip(title);
-            homePlay->setText(playing ? QStringLiteral("暂停播放") : QStringLiteral("播放音乐"));
+            I18n::setText(homePlay,
+                          playing ? QStringLiteral("暂停播放") : QStringLiteral("播放音乐"));
             homePlay->setIcon(UiKit::icon(playing ? "pause" : "play"));
             footerPlay->setIcon(UiKit::icon(playing ? "pause" : "play"));
         });
@@ -354,7 +364,7 @@ void MainWindow::openPage(int index) {
     currentPage = index;
     for (int i = 0; i < navigation.size(); ++i)
         navigation[i]->setChecked(i == index);
-    pageTitle->setText(index == 0 ? QStringLiteral("车载空间") : names[index]);
+    I18n::setText(pageTitle, index == 0 ? QStringLiteral("车载空间") : names[index]);
     if (index == 5) {
         if (music)
             music->pause();
@@ -369,30 +379,33 @@ void MainWindow::openPage(int index) {
 }
 void MainWindow::updateClock() {
     const auto now = QDateTime::currentDateTime();
-    clockLabel->setText(now.toString("HH:mm"));
-    QLocale locale(QLocale::Chinese, QLocale::China);
-    dateLabel->setText(locale.toString(now.date(), QStringLiteral("M月d日  dddd")));
+    I18n::setText(clockLabel, now.toString("HH:mm"));
+    const QLocale locale = I18n::instance().locale();
+    I18n::setLiteralText(dateLabel,
+                         locale.toString(now.date(), I18n::instance().language() == "zh_CN"
+                                                         ? QStringLiteral("M月d日  dddd")
+                                                         : "ddd, MMM d"));
     const auto minutes = session.elapsed() / 60000;
-    sessionLabel->setText(QStringLiteral("本次使用 %1:%2")
-                              .arg(minutes / 60, 2, 10, QChar('0'))
-                              .arg(minutes % 60, 2, 10, QChar('0')));
+    I18n::setText(sessionLabel, QStringLiteral("本次使用 %1:%2")
+                                    .arg(minutes / 60, 2, 10, QChar('0'))
+                                    .arg(minutes % 60, 2, 10, QChar('0')));
 }
 void MainWindow::updateStatus() {
-    networkLabel->setText(SystemStatus::network());
-    positionLabel->setText(gnss->fix().valid ? QStringLiteral("定位已就绪")
-                                             : QStringLiteral("定位未就绪"));
+    I18n::setText(networkLabel, SystemStatus::network());
+    I18n::setText(positionLabel,
+                  gnss->fix().valid ? QStringLiteral("定位已就绪") : QStringLiteral("定位未就绪"));
 }
 void MainWindow::updateWeather() {
     const auto &report = weather->report();
     if (report.days.isEmpty()) {
-        weatherLabel->setText("--°");
-        weatherDetail->setText(QStringLiteral("天气暂不可用"));
+        I18n::setText(weatherLabel, "--°");
+        I18n::setText(weatherDetail, QStringLiteral("天气暂不可用"));
         return;
     }
     const auto &day = report.days.first();
-    weatherLabel->setText(day.high + "°");
-    weatherDetail->setText(report.city + " · " + day.description + "\n" + day.low + "° / " +
-                           day.high + "°");
+    I18n::setText(weatherLabel, day.high + "°");
+    I18n::setText(weatherDetail,
+                  report.city + " · " + day.description + "\n" + day.low + "° / " + day.high + "°");
 }
 void MainWindow::handleVoice(VoiceCommand command) {
     switch (command) {
@@ -465,13 +478,15 @@ void MainWindow::capturePages(const QString &directory) {
     QDir().mkpath(directory);
     auto *step = new QTimer(this);
     auto counter = QSharedPointer<int>::create(0);
-    connect(step, &QTimer::timeout, this, [this, step, counter, directory]() {
-        const QStringList captures = {"home",    "map",    "music",    "video",
-                                      "weather", "camera", "settings", "display",
-                                      "device",  "time",   "night",    "large-text"};
+    const QString originalLanguage = I18n::instance().language();
+    connect(step, &QTimer::timeout, this, [this, step, counter, directory, originalLanguage]() {
+        const QStringList captures = {"home",   "map",        "music",   "video",      "weather",
+                                      "camera", "settings",   "display", "device",     "time",
+                                      "night",  "large-text", "home-en", "settings-en"};
         if (*counter > 0)
             grab().save(directory + "/" + captures[*counter - 1] + ".png");
         if (*counter >= captures.size()) {
+            I18n::instance().setLanguage(originalLanguage);
             step->stop();
             step->deleteLater();
             qApp->quit();
@@ -482,9 +497,15 @@ void MainWindow::capturePages(const QString &directory) {
         } else if (*counter < 10) {
             openPage(6);
             settings->findChild<QTabWidget *>()->setCurrentIndex(*counter - 6);
-        } else {
+        } else if (*counter < 12) {
             openPage(0);
             UiKit::applyTheme(*counter == 10, *counter == 11);
+        } else {
+            UiKit::applyTheme();
+            I18n::instance().setLanguage("en_US");
+            openPage(*counter == 12 ? 0 : 6);
+            if (*counter == 13)
+                settings->findChild<QTabWidget *>()->setCurrentIndex(0);
         }
         ++*counter;
     });

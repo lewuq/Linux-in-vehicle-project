@@ -1,3 +1,4 @@
+#include "Core/i18n.h"
 #include "Ui/uikit.h"
 #include "mainwindow.h"
 #include <QApplication>
@@ -15,6 +16,7 @@ int main(int argc, char *argv[]) {
     if (!qEnvironmentVariableIsEmpty("VEHICLE_PREFERENCES"))
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
                            qEnvironmentVariable("VEHICLE_PREFERENCES"));
+    I18n::instance().initialize();
     app.setStyle("Fusion");
     const int fontId = QFontDatabase::addApplicationFont(":/fonts/Fonts/NotoSansCJK-Regular.ttc");
     if (fontId >= 0) {

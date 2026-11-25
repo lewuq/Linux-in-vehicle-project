@@ -1,4 +1,5 @@
 #include "searchmusic.h"
+#include "Core/i18n.h"
 #include "Core/network.h"
 #include "Ui/uikit.h"
 #include <QHBoxLayout>
@@ -18,7 +19,7 @@ SearchMusic::SearchMusic(QWidget *parent) : QMainWindow(parent) {
     auto *row = new QHBoxLayout;
     auto *back = UiKit::button(QStringLiteral("返回音乐"), "back");
     query = new QLineEdit;
-    query->setPlaceholderText(QStringLiteral("搜索歌曲或歌手"));
+    I18n::setProperty(query, "placeholderText", QStringLiteral("搜索歌曲或歌手"));
     searchButton = UiKit::button(QStringLiteral("搜索"), "music");
     row->addWidget(back);
     row->addWidget(query, 1);
@@ -60,7 +61,7 @@ void SearchMusic::search() {
     active = reply;
     Network::setTimeout(reply);
     searchButton->setEnabled(false);
-    status->setText(QStringLiteral("正在搜索…"));
+    I18n::setText(status, QStringLiteral("正在搜索…"));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (active != reply)
@@ -68,7 +69,7 @@ void SearchMusic::search() {
         active = nullptr;
         searchButton->setEnabled(true);
         if (reply->error() != QNetworkReply::NoError) {
-            status->setText(QStringLiteral("搜索失败，请检查网络或稍后重试"));
+            I18n::setText(status, QStringLiteral("搜索失败，请检查网络或稍后重试"));
             return;
         }
         const auto doc = QJsonDocument::fromJson(reply->readAll());
@@ -87,7 +88,8 @@ void SearchMusic::search() {
             item->setData(Qt::UserRole,
                           QString("https://music.163.com/song/media/outer/url?id=%1.mp3").arg(id));
         }
-        status->setText(results->count() ? QStringLiteral("找到 %1 首歌曲").arg(results->count())
-                                         : QStringLiteral("暂无搜索结果或服务暂不可用"));
+        I18n::setText(status, results->count()
+                                  ? QStringLiteral("找到 %1 首歌曲").arg(results->count())
+                                  : QStringLiteral("暂无搜索结果或服务暂不可用"));
     });
 }
