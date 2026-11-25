@@ -1,21 +1,27 @@
-# Qt/qmake build artifacts
+# Build output
+build*/
+debug/
+release/
+.qmake.stash
+Makefile*
 *.o
 *.obj
 *.a
 *.so
 *.so.*
-
-# Qt generated source/header files
-moc_*.cpp
-moc_*.h
-qrc_*.cpp
+*.exe
+*.dll
+moc_*
+qrc_*
 ui_*.h
-
-# qmake generated files
-Makefile
 *.pro.user*
+/VehicleTerminal
+/vehicle-tests
 
-# Build directories
-build/
-debug/
-release/
+# Local configuration and runtime data
+vehicle.ini
+*.local.ini
+record.wav
+/map.png
+*.part
+*.log

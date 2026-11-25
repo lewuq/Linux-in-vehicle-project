@@ -1,651 +1,492 @@
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
-#include <QIcon>
-#include <QProcess>
-#include <QPainter>
-#include <QPainterPath>
-#include <QLabel>
-#include <QRegularExpression>
-
-static QString normalizeSpeechText(const QString &input)
-{
-    QString text = input;
-    text = text.simplified();
-    text.remove(QRegularExpression(QString::fromUtf8(R"([，。！？；：,.!?;:"'`~@#$%^&*()_+=\[\]{}<>|/\\-])")));
-    text.remove(' ');
-    return text;
-}
-
-static bool containsAnyPhrase(const QString &text, const QStringList &phrases)
-{
-    for (int i = 0; i < phrases.size(); ++i) {
-        if (text.contains(phrases.at(i))) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static QIcon buildCircularCardIcon(const QString &path, int diameter)
-{
-    QPixmap src(path);
-    if (src.isNull()) {
-        return QIcon();
-    }
-
-    QPixmap canvas(diameter, diameter);
-    canvas.fill(Qt::transparent);
-
-    QPainter painter(&canvas);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform);
-
-    QRect circleRect(2, 2, diameter - 4, diameter - 4);
-
-    // Soft circle plate with light rim to avoid dark edge on LCD.
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(255, 255, 255, 230));
-    painter.drawEllipse(circleRect);
-
-    QPainterPath clipPath;
-    clipPath.addEllipse(circleRect.adjusted(3, 3, -3, -3));
-    painter.setClipPath(clipPath);
-
-    QPixmap scaled = src.scaled(circleRect.size(), Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-    int x = circleRect.center().x() - scaled.width() / 2;
-    int y = circleRect.center().y() - scaled.height() / 2;
-    painter.drawPixmap(x, y, scaled);
-
-    painter.setClipping(false);
-    painter.setPen(QPen(QColor(215, 225, 236, 200), 1));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawEllipse(circleRect.adjusted(1, 1, -1, -1));
-
-    return QIcon(canvas);
-}
-
-static QIcon buildVideoModuleIcon(int diameter)
-{
-    QPixmap canvas(diameter, diameter);
-    canvas.fill(Qt::transparent);
-
-    QPainter painter(&canvas);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform);
-
-    QRect outerRect(2, 2, diameter - 4, diameter - 4);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(255, 255, 255, 235));
-    painter.drawEllipse(outerRect);
-
-    QRect filmRect = outerRect.adjusted(24, 34, -24, -34);
-    painter.setBrush(QColor(38, 62, 89, 230));
-    painter.setPen(QPen(QColor(205, 220, 235, 210), 1));
-    painter.drawRoundedRect(filmRect, 16, 16);
-
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(208, 226, 246, 220));
-    const int notchW = 10;
-    const int notchH = 7;
-    for (int i = 0; i < 4; ++i) {
-        const int x = filmRect.left() + 12 + i * ((filmRect.width() - 24) / 3);
-        painter.drawRoundedRect(QRect(x, filmRect.top() + 6, notchW, notchH), 2, 2);
-        painter.drawRoundedRect(QRect(x, filmRect.bottom() - 12, notchW, notchH), 2, 2);
-    }
-
-    QPainterPath playPath;
-    const QPoint c = filmRect.center();
-    playPath.moveTo(c.x() - 8, c.y() - 18);
-    playPath.lineTo(c.x() + 20, c.y());
-    playPath.lineTo(c.x() - 8, c.y() + 18);
-    playPath.closeSubpath();
-    painter.setBrush(QColor(96, 205, 255, 235));
-    painter.drawPath(playPath);
-
-    painter.setPen(QPen(QColor(215, 225, 236, 200), 1));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawEllipse(outerRect.adjusted(1, 1, -1, -1));
-
-    return QIcon(canvas);
-}
-
+#include "Core/gnssservice.h"
+#include "Core/speechservice.h"
+#include "Core/systemstatus.h"
+#include "Core/weatherservice.h"
+#include "Map/baidumap.h"
+#include "Monitor/monitor.h"
+#include "Music/musicplayer.h"
+#include "Ui/uikit.h"
+#include "Weather/weather.h"
+#include "dht11.h"
+#include "onevideo.h"
+#include "settingwindow.h"
+#include <QApplication>
+#include <QDir>
+#include <QGridLayout>
+#include <QHBoxLayout>
+#include <QLocale>
+#include <QSettings>
+#include <QSharedPointer>
+#include <QSignalBlocker>
+#include <QSlider>
+#include <QStackedWidget>
+#include <QTabWidget>
+#include <QVBoxLayout>
+static const QStringList names = {
+    QStringLiteral("首页"), QStringLiteral("地图"), QStringLiteral("音乐"), QStringLiteral("视频"),
+    QStringLiteral("天气"), QStringLiteral("影像"), QStringLiteral("设置")};
+static const QStringList symbols = {"home",    "map",    "music",   "video",
+                                    "weather", "camera", "settings"};
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
-    , ui(new Ui::MainWindow)
-{
-    ui->setupUi(this);
-    
-    // ===== 工程约束：窗口装饰控制（补充配置） =====
-    // 主.pro和main.cpp中已设置全屏/固定尺寸，此处为额外防护
-    this->setFocusPolicy(Qt::StrongFocus);  // 确保主窗口能接收所有键盘事件
-    
-    QWidget *clockCard = new QWidget(this);
-    clockCard->setObjectName("clockCard");
-    QVBoxLayout *clockCardLayout = new QVBoxLayout(clockCard);
-    clockCardLayout->setContentsMargins(10, 10, 10, 10);
-    clockCardLayout->addWidget(&clock);
-    ui->videoVLayout->addWidget(clockCard);
-
-    this->resize(1024,600);
-
-    // 主页面视觉升级：小米车机感浅色背景 + 六张悬浮卡片（4功能 + 时钟 + 信息）。
-    ui->gridLayout->setContentsMargins(18, 18, 18, 18);
-    ui->gridLayout->setHorizontalSpacing(16);
-    ui->gridLayout->setVerticalSpacing(16);
-
-    ui->pBtn_Weather->setStyleSheet("");
-    ui->pBtn_Music->setStyleSheet("");
-    ui->pBtn_Map->setStyleSheet("");
-    ui->pBtn_Monitor->setStyleSheet("");
-    ui->pushButton_2->setStyleSheet("");
-    ui->pBtn_Setting->setStyleSheet("");
-    ui->groupBox->setStyleSheet("");
-    ui->label_Date->setStyleSheet("");
-
-    const int iconDiameter = 188;
-    ui->pBtn_Weather->setIcon(buildCircularCardIcon(":/img/weather.jpg", iconDiameter));
-    ui->pBtn_Music->setIcon(buildCircularCardIcon(":/img/music.png", iconDiameter));
-    ui->pBtn_Map->setIcon(buildCircularCardIcon(":/img/map.jpg", iconDiameter));
-    ui->pBtn_Monitor->setIcon(buildCircularCardIcon(":/img/monitor.png", iconDiameter));
-    ui->pushButton_2->setIcon(buildVideoModuleIcon(iconDiameter));
-    ui->pBtn_Setting->setIcon(buildCircularCardIcon(":/img/settting.png", iconDiameter));
-    ui->pBtn_Weather->setIconSize(QSize(iconDiameter, iconDiameter));
-    ui->pBtn_Music->setIconSize(QSize(iconDiameter, iconDiameter));
-    ui->pBtn_Map->setIconSize(QSize(iconDiameter, iconDiameter));
-    ui->pBtn_Monitor->setIconSize(QSize(iconDiameter, iconDiameter));
-    ui->pushButton_2->setIconSize(QSize(iconDiameter, iconDiameter));
-    ui->pBtn_Setting->setIconSize(QSize(iconDiameter, iconDiameter));
-    ui->pBtn_Weather->setText(QString());
-    ui->pBtn_Music->setText(QString());
-    ui->pBtn_Map->setText(QString());
-    ui->pBtn_Monitor->setText(QString());
-    ui->pushButton_2->setText(QString());
-    ui->pBtn_Setting->setText(QString());
-
-    auto addBottomCaption = [](QPushButton *btn, const QString &text) {
-        QVBoxLayout *captionLayout = new QVBoxLayout(btn);
-        captionLayout->setContentsMargins(6, 6, 6, 8);
-        captionLayout->addStretch();
-        QLabel *caption = new QLabel(text, btn);
-        caption->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-        caption->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
-        caption->setStyleSheet("color:#1f3447;font-size:19px;font-weight:700;background:transparent;");
-        captionLayout->addWidget(caption, 0, Qt::AlignHCenter | Qt::AlignBottom);
-    };
-    addBottomCaption(ui->pBtn_Weather, QString::fromUtf8("天气"));
-    addBottomCaption(ui->pBtn_Music, QString::fromUtf8("音乐"));
-    addBottomCaption(ui->pBtn_Map, QString::fromUtf8("地图"));
-    addBottomCaption(ui->pBtn_Monitor, QString::fromUtf8("监控"));
-    addBottomCaption(ui->pushButton_2, QString::fromUtf8("视频"));
-    addBottomCaption(ui->pBtn_Setting, QString::fromUtf8("设置"));
-
-    ui->pushButton_3->hide();
-    ui->pushButton_4->hide();
-    ui->pushButton_5->hide();
-    ui->pushButton_6->hide();
-
-    this->setStyleSheet(R"(
-        QMainWindow#MainWindow {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                        stop:0 #d8dde2, stop:0.55 #e3e8ec, stop:1 #edf1f4);
-        }
-
-        QWidget#centralwidget,
-        QWidget#page {
-            background: transparent;
-        }
-
-        QWidget#clockCard,
-        QGroupBox#groupBox,
-        QPushButton#pBtn_Weather,
-        QPushButton#pBtn_Music,
-        QPushButton#pBtn_Map,
-        QPushButton#pBtn_Monitor,
-        QPushButton#pushButton_2,
-        QPushButton#pBtn_Setting {
-            background-color: rgba(178, 209, 240, 0.98);
-            border: 1px solid rgba(1, 9, 17, 0.24);
-            border-radius: 24px;
-        }
-
-        QWidget#clockCard {
-            padding: 6px;
-        }
-
-        QPushButton#pBtn_Weather,
-        QPushButton#pBtn_Music,
-        QPushButton#pBtn_Map,
-        QPushButton#pBtn_Monitor,
-        QPushButton#pushButton_2,
-        QPushButton#pBtn_Setting {
-            padding: 6px 10px 6px 10px;
-            text-align: bottom center;
-        }
-
-        QPushButton#pBtn_Weather:pressed,
-        QPushButton#pBtn_Music:pressed,
-        QPushButton#pBtn_Map:pressed,
-        QPushButton#pBtn_Monitor:pressed,
-        QPushButton#pushButton_2:pressed,
-        QPushButton#pBtn_Setting:pressed {
-            background-color: rgba(212, 223, 233, 0.98);
-        }
-
-        QGroupBox#groupBox {
-            margin-top: 0px;
-            padding: 14px;
-        }
-
-        QLabel#label_Time {
-            color: #3b4d5d;
-            font-size: 20px;
-            font-weight: 700;
-        }
-
-        QLabel#label_Date {
-            color: #1d2936;
-            font-size: 28px;
-            font-weight: 700;
-        }
-
-        QLabel#label_temp {
-            color: #8a3f3f;
-            font-size: 22px;
-            font-weight: 700;
-        }
-
-        QLabel#label_humi {
-            color: #2f6e6a;
-            font-size: 22px;
-            font-weight: 700;
-        }
-    )");
-
-    // 首页保留一个主时钟（左侧仪表），右侧仅显示日期与功能入口，避免重复显示两个时钟。
-    ui->label_Time->setText("系统日期");
-
-    quickSetTimeBtn = new QPushButton(QString::fromUtf8("手动校时"), ui->groupBox);
-    quickSetTimeBtn->setObjectName("quickSetTimeBtn");
-    quickSetTimeBtn->setMinimumSize(180, 56);
-    quickSetTimeBtn->setStyleSheet("QPushButton#quickSetTimeBtn{background:#d8ecff;color:#13406e;"
-                                   "background:#e3eaf1;color:#2a4358;"
-                                   "border:1px solid #b8c6d3;border-radius:14px;font-size:22px;"
-                                   "font-weight:700;padding:10px 16px;}"
-                                   "QPushButton#quickSetTimeBtn:pressed{background:#d8e2ea;}");
-    ui->verticalLayout->addWidget(quickSetTimeBtn);
-    connect(quickSetTimeBtn, SIGNAL(clicked()), this, SLOT(on_quickSetTime_clicked()));
-
-    networkSyncBtn = new QPushButton(QString::fromUtf8("联网校时(北京时间)"), ui->groupBox);
-    networkSyncBtn->setObjectName("networkSyncBtn");
-    networkSyncBtn->setMinimumSize(180, 48);
-    networkSyncBtn->setStyleSheet("QPushButton#networkSyncBtn{background:#dde8f2;color:#294458;"
-                                  "border:1px solid #b8c6d3;border-radius:12px;font-size:18px;"
-                                  "font-weight:700;padding:8px 14px;}"
-                                  "QPushButton#networkSyncBtn:pressed{background:#cfdde9;}");
-    ui->verticalLayout->addWidget(networkSyncBtn);
-    connect(networkSyncBtn, SIGNAL(clicked()), this, SLOT(on_networkTimeSync_clicked()));
-
-    ui->stackedWidget->installEventFilter(this);
-    dht11 = new Dht11;
-
-    // ===== 工程约束：子窗口动态创建与内存管理 =====
-    // 【重要】以下子窗口现在采用 new 动态分配，而非栈分配
-    // 好处：1) 除非被显示，否则不占用内存；2) 支持懒加载；3) 便于后续优化成单例模式
-    baiduMap = new BaiduMap(this);      // 地图模块
-    monitor = Monitor::getInstance();    // 监测模块（已使用单例）
-    musicPlayer = new MusicPlayer(this); // 音乐模块
-    weather = new Weather(this);         // 天气模块
-    
-    // 窗口列表：用于集中管理和事件分发
-    windows.append(baiduMap);
-    windows.append(monitor);
-    windows.append(weather);
-    windows.append(musicPlayer);
-    time = new QTimer;
-    time->setInterval(500);
-    time->start();
-    dht11->start();
-    request  = new QNetworkRequest;
-    networkManage = new QNetworkAccessManager;
-    request->setHeader(QNetworkRequest::ContentTypeHeader,QVariant("application/json"));
-    connect(networkManage,SIGNAL(finished(QNetworkReply *)),this,SLOT(getSpeechResult(QNetworkReply *)));
-    AsrThread = new SpeechRecognition();
-    AsrThread->startSpeechRecognition();
-    connect(AsrThread,SIGNAL(RecordFinished()),this,SLOT(on_handleRecord()));
-    connect(time,SIGNAL(timeout()),this,SLOT(on_timer_updateTime()));
-    connect(dht11,SIGNAL(updateDht11Data(QString ,QString )),this,SLOT(on_update_humidity_temp(QString, QString)));
-
-    connect(this,SIGNAL(SendCommandToMap(int)),baiduMap,SLOT(on_handleCommand(int)));
-    connect(this,SIGNAL(SendCommandToMonitor(int)),monitor,SLOT(on_handleCommand(int)));
-    connect(this,SIGNAL(SendCommandToMusic(int)),musicPlayer,SLOT(on_handleCommand(int)));
-    connect(ui->pushButton_2, SIGNAL(clicked()), this, SLOT(on_pBtn_Video_clicked()));
-
+    : QMainWindow(parent), pages(7, nullptr), gnss(new GnssService(this)),
+      weather(new WeatherService(this)), speech(new SpeechService(this)), sensor(new Dht11(this)) {
+    setObjectName("vehicleTerminal");
+    resize(1024, 600);
+    session.start();
+    auto *shell = new QWidget;
+    shell->setObjectName("shell");
+    setCentralWidget(shell);
+    auto *root = new QHBoxLayout(shell);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(0);
+    auto *rail = new QFrame;
+    rail->setObjectName("rail");
+    rail->setFixedWidth(84);
+    auto *nav = new QVBoxLayout(rail);
+    nav->setContentsMargins(10, 18, 10, 14);
+    nav->setSpacing(5);
+    auto *brand = UiKit::label(QString());
+    brand->setAlignment(Qt::AlignCenter);
+    brand->setPixmap(UiKit::icon("car", QColor("#53665b"), 30).pixmap(30, 30));
+    nav->addWidget(brand);
+    nav->addSpacing(14);
+    for (int i = 0; i < names.size(); ++i) {
+        auto *button = new QPushButton;
+        button->setObjectName("nav_" + symbols[i]);
+        button->setProperty("nav", true);
+        button->setCheckable(true);
+        button->setFixedSize(64, 60);
+        button->setAccessibleName(names[i]);
+        auto *column = new QVBoxLayout(button);
+        column->setContentsMargins(2, 4, 2, 4);
+        column->setSpacing(2);
+        auto *icon = UiKit::label(QString());
+        icon->setPixmap(UiKit::icon(symbols[i]).pixmap(24, 24));
+        icon->setAlignment(Qt::AlignCenter);
+        auto *text = UiKit::label(names[i], "muted");
+        text->setAlignment(Qt::AlignCenter);
+        icon->setAttribute(Qt::WA_TransparentForMouseEvents);
+        text->setAttribute(Qt::WA_TransparentForMouseEvents);
+        column->addWidget(icon);
+        column->addWidget(text);
+        nav->addWidget(button);
+        navigation.append(button);
+        connect(button, &QPushButton::clicked, this, [this, i]() { openPage(i); });
+    }
+    nav->addStretch();
+    root->addWidget(rail);
+    auto *content = new QVBoxLayout;
+    content->setContentsMargins(22, 0, 22, 0);
+    content->setSpacing(0);
+    root->addLayout(content, 1);
+    auto *header = new QFrame;
+    header->setObjectName("header");
+    header->setFixedHeight(70);
+    auto *headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(4, 8, 4, 8);
+    pageTitle = UiKit::label(QStringLiteral("车载空间"), "heading");
+    headerLayout->addWidget(pageTitle);
+    headerLayout->addStretch();
+    networkLabel = UiKit::label(QString(), "muted");
+    positionLabel = UiKit::label(QString(), "badge");
+    headerLayout->addWidget(networkLabel);
+    headerLayout->addSpacing(16);
+    headerLayout->addWidget(positionLabel);
+    content->addWidget(header);
+    stack = new QStackedWidget;
+    pages[0] = createHome();
+    stack->addWidget(pages[0]);
+    content->addWidget(stack, 1);
+    auto *footer = new QFrame;
+    footer->setObjectName("footer");
+    footer->setFixedHeight(72);
+    auto *footerLayout = new QHBoxLayout(footer);
+    footerLayout->setContentsMargins(4, 10, 4, 10);
+    auto *note = UiKit::label(QString());
+    note->setPixmap(UiKit::icon("music").pixmap(24, 24));
+    footerLayout->addWidget(note);
+    footerSong = UiKit::label(QStringLiteral("音乐，让旅途慢下来"), "muted");
+    footerSong->setMaximumWidth(270);
+    footerLayout->addWidget(footerSong, 1);
+    footerPlay = UiKit::button(QString(), "play");
+    footerPlay->setFixedWidth(50);
+    footerLayout->addWidget(footerPlay);
+    auto *volume = UiKit::button(QString(), "volume");
+    volume->setCheckable(true);
+    volume->setToolTip(QStringLiteral("静音 / 恢复音量"));
+    footerLayout->addWidget(volume);
+    volumeSlider = new QSlider(Qt::Horizontal);
+    volumeSlider->setRange(0, 100);
+    volumeSlider->setValue(QSettings().value("audio/volume", 35).toInt());
+    volumeSlider->setFixedWidth(110);
+    footerLayout->addWidget(volumeSlider);
+    footerLayout->addSpacing(20);
+    voiceLabel = UiKit::label(QStringLiteral("按住说话"), "muted");
+    voiceLabel->setMaximumWidth(185);
+    footerLayout->addWidget(voiceLabel);
+    auto *mic = UiKit::button(QString(), "mic");
+    mic->setToolTip(QStringLiteral("按住录音，松开识别"));
+    mic->setObjectName("voiceButton");
+    footerLayout->addWidget(mic);
+    content->addWidget(footer);
+    connect(mic, &QPushButton::pressed, speech, &SpeechService::start);
+    connect(mic, &QPushButton::released, speech, &SpeechService::stop);
+    connect(speech, &SpeechService::status, voiceLabel, &QLabel::setText);
+    connect(speech, &SpeechService::command, this, &MainWindow::handleVoice);
+    connect(footerPlay, &QPushButton::clicked, this, [this]() { ensureMusic()->togglePlayback(); });
+    connect(volumeSlider, &QSlider::valueChanged, this, [this](int value) {
+        QSettings().setValue("audio/volume", value);
+        if (music)
+            music->setVolume(value);
+        if (video)
+            video->setVolume(value);
+        if (settings)
+            settings->setVolume(value);
+    });
+    connect(volume, &QPushButton::toggled, this, [this, volume](bool muted) {
+        if (muted) {
+            volume->setProperty("previous", qMax(1, volumeSlider->value()));
+            volumeSlider->setValue(0);
+        } else
+            volumeSlider->setValue(volume->property("previous").toInt());
+    });
+    connect(sensor, &Dht11::updateDht11Data, this, [this](QString humidity, QString temperature) {
+        humidityLabel->setText(humidity + " %");
+        temperatureLabel->setText(temperature + " °C");
+        sensorLabel->setText(QStringLiteral("环境传感器 · 实时"));
+    });
+    connect(sensor, &Dht11::unavailable, this, [this](QString reason) {
+        temperatureLabel->setText("-- °C");
+        humidityLabel->setText("-- %");
+        sensorLabel->setText(reason);
+    });
+    sensor->start();
+    connect(gnss, &GnssService::updated, this, &MainWindow::updateStatus);
+    connect(weather, &WeatherService::updated, this, &MainWindow::updateWeather);
+    ticker.setInterval(1000);
+    connect(&ticker, &QTimer::timeout, this, &MainWindow::updateClock);
+    ticker.start();
+    auto *statusTimer = new QTimer(this);
+    statusTimer->setInterval(5000);
+    connect(statusTimer, &QTimer::timeout, this, &MainWindow::updateStatus);
+    statusTimer->start();
+    openPage(0);
+    updateClock();
+    updateStatus();
+    QTimer::singleShot(0, weather, &WeatherService::refresh);
 }
-
-MainWindow::~MainWindow()
-{
-    delete ui;
+MainWindow::~MainWindow() {
+    sensor->requestInterruption();
+    sensor->wait();
+    if (camera)
+        camera->myStop();
 }
-
-
-void MainWindow::on_pBtn_Setting_clicked()
-{
-    settingWindow.showTimeSettingPanel();
+QWidget *MainWindow::createHome() {
+    auto *home = new QWidget;
+    home->setObjectName("homePage");
+    auto *layout = new QVBoxLayout(home);
+    layout->setContentsMargins(4, 0, 4, 0);
+    layout->setSpacing(14);
+    auto *welcome = new QHBoxLayout;
+    auto *intro = new QVBoxLayout;
+    intro->setSpacing(4);
+    intro->addWidget(UiKit::label(QStringLiteral("自在出发"), "title"));
+    intro->addWidget(UiKit::label(QStringLiteral("熟悉的音乐，沿途的风景。"), "muted"));
+    welcome->addLayout(intro);
+    welcome->addStretch();
+    sessionLabel = UiKit::label(QStringLiteral("本次使用 00:00"), "muted");
+    welcome->addWidget(sessionLabel);
+    layout->addLayout(welcome);
+    auto *top = new QHBoxLayout;
+    top->setSpacing(14);
+    auto *hero = UiKit::card();
+    hero->setObjectName("heroCard");
+    auto *heroRow = new QHBoxLayout(hero);
+    heroRow->setContentsMargins(24, 18, 16, 18);
+    auto *clockColumn = new QVBoxLayout;
+    clockColumn->setSpacing(0);
+    clockColumn->addWidget(UiKit::label("YOUR EVERYDAY JOURNEY", "eyebrow"));
+    clockLabel = UiKit::label(QString(), "hero");
+    dateLabel = UiKit::label(QString(), "body");
+    clockColumn->addWidget(clockLabel);
+    clockColumn->addWidget(dateLabel);
+    heroRow->addLayout(clockColumn, 3);
+    heroRow->addWidget(new RoadArtwork, 2);
+    top->addWidget(hero, 5);
+    auto *weatherCard = UiKit::card();
+    auto *weatherLayout = new QVBoxLayout(weatherCard);
+    weatherLayout->setContentsMargins(20, 18, 20, 18);
+    auto *weatherTop = new QHBoxLayout;
+    weatherTop->addWidget(UiKit::label(QStringLiteral("沿途天气"), "muted"));
+    weatherTop->addStretch();
+    weatherImage = UiKit::label(QString());
+    weatherImage->setPixmap(UiKit::icon("weather", QColor("#a89468"), 30).pixmap(30, 30));
+    weatherTop->addWidget(weatherImage);
+    weatherLayout->addLayout(weatherTop);
+    weatherLabel = UiKit::label("--°", "metric");
+    weatherDetail = UiKit::label(QStringLiteral("天气暂不可用"), "muted");
+    weatherDetail->setWordWrap(true);
+    weatherLayout->addWidget(weatherLabel);
+    weatherLayout->addWidget(weatherDetail);
+    weatherLayout->addStretch();
+    top->addWidget(weatherCard, 2);
+    layout->addLayout(top, 4);
+    auto *quick = new QHBoxLayout;
+    quick->setSpacing(12);
+    const QVector<int> shortcuts = {1, 2, 3, 5};
+    const QStringList captions = {QStringLiteral("地图与位置"), QStringLiteral("我的音乐"),
+                                  QStringLiteral("本地视频"), QStringLiteral("摄像头影像")};
+    for (int i = 0; i < shortcuts.size(); ++i) {
+        const int index = shortcuts[i];
+        auto *button = UiKit::button(captions[i], symbols[index]);
+        button->setProperty("quick", true);
+        button->setMinimumHeight(66);
+        connect(button, &QPushButton::clicked, this, [this, index]() { openPage(index); });
+        quick->addWidget(button, 1);
+    }
+    layout->addLayout(quick);
+    auto *bottom = new QHBoxLayout;
+    bottom->setSpacing(14);
+    auto *playing = UiKit::card();
+    auto *playingLayout = new QVBoxLayout(playing);
+    playingLayout->setContentsMargins(20, 16, 20, 16);
+    playingLayout->addWidget(UiKit::label(QStringLiteral("正在播放"), "muted"));
+    songLabel = UiKit::label(QStringLiteral("留一点时间给喜欢的旋律"), "heading");
+    songLabel->setWordWrap(true);
+    playingLayout->addWidget(songLabel);
+    auto *playRow = new QHBoxLayout;
+    auto *previous = UiKit::button(QString(), "previous");
+    homePlay = UiKit::button(QStringLiteral("播放音乐"), "play");
+    auto *next = UiKit::button(QString(), "next");
+    playRow->addWidget(previous);
+    playRow->addWidget(homePlay, 1);
+    playRow->addWidget(next);
+    playingLayout->addLayout(playRow);
+    connect(previous, &QPushButton::clicked, this, [this]() { ensureMusic()->previous(); });
+    connect(homePlay, &QPushButton::clicked, this, [this]() { ensureMusic()->togglePlayback(); });
+    connect(next, &QPushButton::clicked, this, [this]() { ensureMusic()->next(); });
+    bottom->addWidget(playing, 5);
+    auto *environment = UiKit::card();
+    auto *envLayout = new QVBoxLayout(environment);
+    envLayout->setContentsMargins(20, 16, 20, 16);
+    envLayout->addWidget(UiKit::label(QStringLiteral("环境感知"), "muted"));
+    auto *metrics = new QHBoxLayout;
+    temperatureLabel = UiKit::label("-- °C", "metric");
+    humidityLabel = UiKit::label("-- %", "metric");
+    metrics->addWidget(temperatureLabel);
+    metrics->addStretch();
+    metrics->addWidget(humidityLabel);
+    envLayout->addLayout(metrics);
+    sensorLabel = UiKit::label(QStringLiteral("等待传感器"), "muted");
+    sensorLabel->setWordWrap(true);
+    envLayout->addWidget(sensorLabel);
+    bottom->addWidget(environment, 4);
+    layout->addLayout(bottom, 3);
+    return home;
 }
-
-void MainWindow::on_quickSetTime_clicked()
-{
-    settingWindow.showTimeSettingPanel();
+MusicPlayer *MainWindow::ensureMusic() {
+    ensurePage(2);
+    return music;
 }
-
-void MainWindow::on_update_humidity_temp(QString humidity, QString temp)
-{
-    ui->label_humi->setText(humidity);
-    ui->label_temp->setText(temp);
+QWidget *MainWindow::ensurePage(int index) {
+    if (index < 0 || index >= pages.size())
+        return nullptr;
+    if (pages[index])
+        return pages[index];
+    QWidget *page = nullptr;
+    switch (index) {
+    case 1:
+        map = new BaiduMap(gnss);
+        page = map;
+        break;
+    case 2:
+        music = new MusicPlayer;
+        page = music;
+        music->setVolume(volumeSlider->value());
+        connect(music, &MusicPlayer::nowPlayingChanged, this, [this](QString title, bool playing) {
+            songLabel->setText(title);
+            footerSong->setText(footerSong->fontMetrics().elidedText(title, Qt::ElideRight, 260));
+            footerSong->setToolTip(title);
+            homePlay->setText(playing ? QStringLiteral("暂停播放") : QStringLiteral("播放音乐"));
+            homePlay->setIcon(UiKit::icon(playing ? "pause" : "play"));
+            footerPlay->setIcon(UiKit::icon(playing ? "pause" : "play"));
+        });
+        connect(music, &MusicPlayer::volumeChanged, volumeSlider, &QSlider::setValue);
+        break;
+    case 3:
+        video = new OneVideo;
+        video->setVolume(volumeSlider->value());
+        connect(video, &OneVideo::volumeChanged, volumeSlider, &QSlider::setValue);
+        page = video;
+        break;
+    case 4:
+        page = new Weather(weather);
+        break;
+    case 5:
+        camera = new Monitor;
+        page = camera;
+        break;
+    case 6:
+        settings = new SettingWindow(gnss);
+        page = settings;
+        settings->setVolume(volumeSlider->value());
+        connect(settings, &SettingWindow::volumeRequested, volumeSlider, &QSlider::setValue);
+        break;
+    default:
+        return pages[0];
+    }
+    page->setWindowFlags(Qt::Widget);
+    page->setMinimumSize(0, 0);
+    pages[index] = page;
+    stack->addWidget(page);
+    return page;
 }
-
-void MainWindow::getSpeechResult(QNetworkReply *reply)
-{
-    qDebug()<<"getSpeechResult";
-    if (!reply) {
-        qDebug() << "reply is null";
+void MainWindow::openPage(int index) {
+    if (index < 0 || index >= pages.size())
+        return;
+    if (currentPage == 5 && camera && index != 5)
+        camera->myStop();
+    if (currentPage == 3 && video && index != 3)
+        video->pause();
+    QWidget *page = ensurePage(index);
+    stack->setCurrentWidget(page);
+    currentPage = index;
+    for (int i = 0; i < navigation.size(); ++i)
+        navigation[i]->setChecked(i == index);
+    pageTitle->setText(index == 0 ? QStringLiteral("车载空间") : names[index]);
+    if (index == 5) {
+        if (music)
+            music->pause();
+        camera->myStart();
+    }
+    if (index == 3) {
+        if (music)
+            music->pause();
+    }
+    if (index == 2 && video)
+        video->pause();
+}
+void MainWindow::updateClock() {
+    const auto now = QDateTime::currentDateTime();
+    clockLabel->setText(now.toString("HH:mm"));
+    QLocale locale(QLocale::Chinese, QLocale::China);
+    dateLabel->setText(locale.toString(now.date(), QStringLiteral("M月d日  dddd")));
+    const auto minutes = session.elapsed() / 60000;
+    sessionLabel->setText(QStringLiteral("本次使用 %1:%2")
+                              .arg(minutes / 60, 2, 10, QChar('0'))
+                              .arg(minutes % 60, 2, 10, QChar('0')));
+}
+void MainWindow::updateStatus() {
+    networkLabel->setText(SystemStatus::network());
+    positionLabel->setText(gnss->fix().valid ? QStringLiteral("定位已就绪")
+                                             : QStringLiteral("定位未就绪"));
+}
+void MainWindow::updateWeather() {
+    const auto &report = weather->report();
+    if (report.days.isEmpty()) {
+        weatherLabel->setText("--°");
+        weatherDetail->setText(QStringLiteral("天气暂不可用"));
         return;
     }
-
-    qDebug()<<"reply is Readable"<<reply->isReadable();
-
-    QByteArray content = reply->readAll();
-    const int lastNewline = content.lastIndexOf('\n');
-    if (lastNewline >= 0) {
-        content.remove(lastNewline, 1);
-    }
-    qDebug()<<content;
-    QJsonDocument doc = QJsonDocument::fromJson(content);
-    if(!doc.isObject()){
-        qDebug()<<"Netjson not an jsonObject!";
-        reply->deleteLater();
-        return;
-    }
-
-    QJsonObject obj = doc.object();
-    const int errNo = obj.value("err_no").toInt(0);
-    const QString errMsg = obj.value("err_msg").toString();
-    if (errNo != 0) {
-        qDebug() << "ASR error:" << errNo << errMsg;
-        reply->deleteLater();
-        return;
-    }
-
-    QJsonArray resutls = obj.value("result").toArray();
-    if (resutls.isEmpty()) {
-        qDebug() << "ASR result empty";
-        reply->deleteLater();
-        return;
-    }
-
-    QString AsrResult = resutls.at(0).toString();
-    qDebug()<<"识别结果:"<<AsrResult;
-
-    const QString cmd = normalizeSpeechText(AsrResult);
-
-    if (containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("播放音乐") << QString::fromUtf8("打开音乐") << QString::fromUtf8("进入音乐") << QString::fromUtf8("来点音乐") << QString::fromUtf8("听歌"))) {
-        musicPlayer->show();
-        musicPlayer->raise();
-        musicPlayer->activateWindow();
-        musicPlayer->playRandomSong();
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("下一首") << QString::fromUtf8("下一曲") << QString::fromUtf8("切歌") << QString::fromUtf8("换一首")))
-    {
-        emit SendCommandToMusic(MUSIC_COMMAND_SHOW);
-        emit SendCommandToMusic(MUSIC_COMMAND_NEXT);
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("上一首") << QString::fromUtf8("上一曲") << QString::fromUtf8("返回上一首")))
-    {
-        emit SendCommandToMusic(MUSIC_COMMAND_SHOW);
-        emit SendCommandToMusic(MUSIC_COMMAND_PRE);
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("暂停音乐") << QString::fromUtf8("暂停播放") << QString::fromUtf8("停止音乐")))
-    {
-        emit SendCommandToMusic(MUSIC_COMMAND_SHOW);
-        emit SendCommandToMusic(MUSIC_COMMAND_PAUSE);
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("退出音乐") << QString::fromUtf8("关闭音乐")))
-    {
-        emit SendCommandToMusic(MUSIC_COMMAND_CLOSE);
-        this->show();
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("打开地图") << QString::fromUtf8("进入地图") << QString::fromUtf8("查看地图")))
-    {
-        emit SendCommandToMap(MAP_COMMAND_SHOW);
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("地图放大") << QString::fromUtf8("放大地图") << QString::fromUtf8("放大一点") << QString::fromUtf8("放大")))
-    {
-        emit SendCommandToMap(MAP_COMMAND_SHOW);
-        emit SendCommandToMap(MAP_COMMAND_AMPLIFY);
-
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("地图缩小") << QString::fromUtf8("缩小地图") << QString::fromUtf8("缩小一点") << QString::fromUtf8("缩小")))
-    {
-        emit SendCommandToMap(MAP_COMMAND_SHOW);
-        emit SendCommandToMap(MAP_COMMAND_SHRINK);
-
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("开始倒车") << QString::fromUtf8("打开监控") << QString::fromUtf8("打开摄像头") << QString::fromUtf8("查看监控") << QString::fromUtf8("倒车影像")))
-    {
-        monitor->show();
-        monitor->raise();
-        monitor->activateWindow();
-        monitor->myStart();
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("查看天气") << QString::fromUtf8("天气怎么样") << QString::fromUtf8("打开天气")))
-    {
-        weather->show();
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("播放视频") << QString::fromUtf8("打开视频") << QString::fromUtf8("进入视频")))
-    {
-        oneVideo.ScanLocalVideos();
-        oneVideo.show();
-        oneVideo.raise();
-        oneVideo.activateWindow();
-        oneVideo.onPlayRandomVideo();
-    }
-    else if(cmd.contains(QString::fromUtf8("下一条视频")) || cmd.contains(QString::fromUtf8("下一个视频")))
-    {
-        oneVideo.onNextVideo();
-    }
-    else if(cmd.contains(QString::fromUtf8("上一条视频")) || cmd.contains(QString::fromUtf8("上一个视频")))
-    {
-        oneVideo.onPrevVideo();
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("暂停视频") << QString::fromUtf8("播放视频") << QString::fromUtf8("继续播放") << QString::fromUtf8("视频播放") << QString::fromUtf8("视频暂停")))
-    {
-        oneVideo.onPlayPauseVideo();
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("打开设置") << QString::fromUtf8("系统设置")))
-    {
-        settingWindow.showTimeSettingPanel();
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("关闭地图") << QString::fromUtf8("退出地图")))
-    {
-        emit SendCommandToMap(MAP_COMMAND_CLOSE);
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("关闭监控") << QString::fromUtf8("退出监控") << QString::fromUtf8("停止监控")))
-    {
-        emit SendCommandToMonitor(MONITOR_COMMAND_CLOSE);
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("关闭视频") << QString::fromUtf8("退出视频")))
-    {
-        oneVideo.hide();
-        this->show();
-    }
-    else if(containsAnyPhrase(cmd, QStringList() << QString::fromUtf8("关闭设置") << QString::fromUtf8("退出设置")))
-    {
-        settingWindow.hide();
-        this->show();
-    }
-    else
-    {
-        qDebug()<<"未识别的指令:"<<AsrResult;
-    }
-    
-    // ===== 工程约束：网络数据及时释放 =====
-    // 【关键】解析完 JSON 后立刻释放 QNetworkReply 对象
-    // 防止长期占用缓冲区，导致 512MB 内存设备 OOM
-    reply->deleteLater();
+    const auto &day = report.days.first();
+    weatherLabel->setText(day.high + "°");
+    weatherDetail->setText(report.city + " · " + day.description + "\n" + day.low + "° / " +
+                           day.high + "°");
 }
-QPoint point,last_point;//按下坐标
-
-bool MainWindow::eventFilter(QObject *watched, QEvent *ev)
-{
-
-    int index,sum;
-        QMouseEvent* event = static_cast<QMouseEvent*>(ev);
-        index = ui->stackedWidget->currentIndex();
-        sum = ui->stackedWidget->count();
-        switch (event->type()) {
-        case QEvent::MouseButtonPress:
-            qDebug()<<"mouse press";
-            point.setY(event->globalY());     // 记录按下点的y坐标
-            point.setX(event->globalX());     // 记录按下点的x坐标
-            break;
-        case QEvent::MouseButtonRelease:
-            qDebug()<<"mouse release";
-            last_point.setY(event->globalY());     // 记录按下点的y坐标
-            last_point.setX(event->globalX());     // 记录按下点的x坐标
-
-            if(last_point.x()-point.x()>200)
-            {
-                ui->stackedWidget->setCurrentIndex(index<(sum-1)?index+1:0);
-            }
-            else if(point.x()-last_point.x()>200)
-            {
-                ui->stackedWidget->setCurrentIndex(index>0?index-1:(sum-1));
-            }
-            break;
-        default:
-            break;
+void MainWindow::handleVoice(VoiceCommand command) {
+    switch (command) {
+    case VoiceCommand::Home:
+        openPage(0);
+        break;
+    case VoiceCommand::Music:
+        openPage(2);
+        music->play();
+        break;
+    case VoiceCommand::MusicPause:
+        if (music)
+            music->pause();
+        break;
+    case VoiceCommand::MusicPlay:
+        openPage(2);
+        music->play();
+        break;
+    case VoiceCommand::MusicNext:
+        ensureMusic()->next();
+        break;
+    case VoiceCommand::MusicPrevious:
+        ensureMusic()->previous();
+        break;
+    case VoiceCommand::Map:
+        openPage(1);
+        break;
+    case VoiceCommand::MapZoomIn:
+        openPage(1);
+        map->zoomIn();
+        break;
+    case VoiceCommand::MapZoomOut:
+        openPage(1);
+        map->zoomOut();
+        break;
+    case VoiceCommand::Weather:
+        openPage(4);
+        break;
+    case VoiceCommand::Camera:
+        openPage(5);
+        break;
+    case VoiceCommand::Video:
+        openPage(3);
+        video->play();
+        break;
+    case VoiceCommand::VideoPause:
+        if (video)
+            video->pause();
+        break;
+    case VoiceCommand::VideoPlay:
+        openPage(3);
+        video->play();
+        break;
+    case VoiceCommand::VideoNext:
+        openPage(3);
+        video->onNextVideo();
+        break;
+    case VoiceCommand::VideoPrevious:
+        openPage(3);
+        video->onPrevVideo();
+        break;
+    case VoiceCommand::Settings:
+        openPage(6);
+        break;
+    default:
+        break;
+    }
+}
+void MainWindow::capturePages(const QString &directory) {
+    QDir().mkpath(directory);
+    auto *step = new QTimer(this);
+    auto counter = QSharedPointer<int>::create(0);
+    connect(step, &QTimer::timeout, this, [this, step, counter, directory]() {
+        const QStringList captures = {"home",    "map",    "music",    "video",
+                                      "weather", "camera", "settings", "display",
+                                      "device",  "time",   "night",    "large-text"};
+        if (*counter > 0)
+            grab().save(directory + "/" + captures[*counter - 1] + ".png");
+        if (*counter >= captures.size()) {
+            step->stop();
+            step->deleteLater();
+            qApp->quit();
+            return;
         }
-    return QWidget::eventFilter(watched,event);//将事件传递给父类
-}
-
-void MainWindow::on_pBtn_Music_clicked()
-{
-    musicPlayer->show();
-}
-
-void MainWindow::on_pBtn_Video_clicked()
-{
-    oneVideo.ScanLocalVideos();
-    oneVideo.show();
-    oneVideo.raise();
-    oneVideo.activateWindow();
-}
-
-void MainWindow::on_networkTimeSync_clicked()
-{
-    syncBeijingTime();
-}
-
-void MainWindow::syncBeijingTime()
-{
-    if (timeSyncManager == nullptr) {
-        timeSyncManager = new QNetworkAccessManager(this);
-        connect(timeSyncManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(on_timeSyncReply(QNetworkReply*)));
-    }
-
-    ui->label_Time->setText(QString::fromUtf8("北京时间同步中..."));
-    timeSyncManager->get(QNetworkRequest(QUrl("http://quan.suning.com/getSysTime.do")));
-}
-
-void MainWindow::on_timeSyncReply(QNetworkReply *reply)
-{
-    const QByteArray content = reply->readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(content);
-
-    if (!doc.isObject()) {
-        ui->label_Time->setText(QString::fromUtf8("校时失败(网络)"));
-        reply->deleteLater();
-        return;
-    }
-
-    const QString beijingTime = doc.object().value("sysTime2").toString();
-    if (beijingTime.isEmpty()) {
-        ui->label_Time->setText(QString::fromUtf8("校时失败(数据)"));
-        reply->deleteLater();
-        return;
-    }
-
-    QProcess process;
-    process.start("date", QStringList() << "-s" << beijingTime);
-    process.waitForFinished();
-    bool ok = (process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0);
-
-    if (ok) {
-        process.start("hwclock", QStringList() << "-w");
-        process.waitForFinished();
-        ok = (process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0);
-    }
-
-    ui->label_Time->setText(ok ? QString::fromUtf8("北京时间已同步") : QString::fromUtf8("校时失败(权限)"));
-    if (ok) {
-        on_timer_updateTime();
-    }
-
-    reply->deleteLater();
-}
-
-void MainWindow::on_pBtn_Weather_clicked()
-{
-    weather->show();
-}
-
-void MainWindow::on_pBtn_Monitor_clicked()
-{
-    monitor->show();
-    monitor->myStart();
-}
-
-void MainWindow::on_pBtn_Map_clicked()
-{
-    baiduMap->show();
-}
-
-void MainWindow::on_timer_updateTime()
-{
-    QString date = QDate::currentDate().toString("yyyy-MM-dd");
-    ui->label_Date->setText(date);
-}
-
-void MainWindow::on_handleRecord()
-{
-    qDebug()<<"TransWavToStr";
-    QFile file("./record.wav");
-    qDebug()<<file.exists();
-    qDebug()<<file.isReadable();
-    if(!file.open(QIODevice::ReadOnly))
-    {
-        qDebug()<<"无法打开文件";
-        return ;
-    }
-    request->setUrl(QUrl::fromUserInput("http://vop.baidu.com/server_api"));
-    QByteArray fileData = file.readAll();
-    file.close();
-    QByteArray base64Encoded = fileData.toBase64();
-    if (fileData.isEmpty()) {
-        qDebug() << "录音文件为空，跳过识别请求";
-        return;
-    }
-
-    QJsonObject obj;
-    obj.insert("format",QJsonValue("wav"));
-    obj.insert("rate",QJsonValue(16000));
-    obj.insert("channel",QJsonValue(1));
-    obj.insert("dev_pid", QJsonValue(1537));
-    obj.insert("cuid",QJsonValue("L5a9DNZMyQD4MyipDR3ck7jhmdvtagj2"));
-    obj.insert("token",QJsonValue("25.e8ff34b13abf78f8173fca370bfc46d2.315360000.2089007905.282335-122390697"));
-    obj.insert("speech",QJsonValue(QString::fromLatin1(base64Encoded)));
-    obj.insert("len",QJsonValue(fileData.length()));
-    QByteArray byte_array = QJsonDocument(obj).toJson();
-    networkManage->post(*request,byte_array);
-
+        if (*counter < 7) {
+            openPage(*counter);
+        } else if (*counter < 10) {
+            openPage(6);
+            settings->findChild<QTabWidget *>()->setCurrentIndex(*counter - 6);
+        } else {
+            openPage(0);
+            UiKit::applyTheme(*counter == 10, *counter == 11);
+        }
+        ++*counter;
+    });
+    step->start(500);
 }

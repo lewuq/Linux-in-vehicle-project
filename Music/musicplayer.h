@@ -1,113 +1,57 @@
-#ifndef MUSICPLAYER_H
-#define MUSICPLAYER_H
-
-#include <Music/searchmusic.h>
+#pragma once
+#include "Core/downloadservice.h"
+#include "Core/medialibrary.h"
+#include <QLabel>
+#include <QListWidget>
 #include <QMainWindow>
 #include <QMediaPlayer>
 #include <QMediaPlaylist>
-#include <QDir>
-#include <QFile>
-#include <QUrl>
-#include <QVector>
-#include <QNetworkReply>
-#include <QMessageBox>
-#include <QLocale>
-#include <QLabel>
-#include <QProgressBar>
-#include <QTimer>
-#include <QHash>
-
-#define MUSIC_COMMAND_CLOSE 0
-#define MUSIC_COMMAND_SHOW 1
-#define MUSIC_COMMAND_CLOSE 0
-#define MUSIC_COMMAND_PRE 2
-#define MUSIC_COMMAND_NEXT 3
-#define MUSIC_COMMAND_PLAY 4
-#define MUSIC_COMMAND_PAUSE 5
-
-namespace Ui {
-class MusicPlayer;
-}
-
-/* 媒体信息结构体 */
-struct MediaObjectInfo {
-    /* 用于保存歌曲文件名 */
-    QString fileName;
-    /* 用于保存歌曲文件路径 */
-    QString filePath;
-};
-
-class MusicPlayer : public QMainWindow
-{
+#include <QPushButton>
+#include <QSlider>
+class SearchMusic;
+class MusicPlayer : public QMainWindow {
     Q_OBJECT
-
 public:
     explicit MusicPlayer(QWidget *parent = nullptr);
-    ~MusicPlayer();
-    QString LocalSongsPath = "/home/root/mytest/Mymusic";
     void ScanLocalSongs();
-    void mediaPlayerInit();
-
-private slots:
-
-    void on_pBtn_OpenSearchWin_clicked();
-    void AddMusicFromUrl(QString name,QString UrlPath);
-
-    void on_listWidget_currentRowChanged(int currentRow);
-
-    void on_pBtn_Pre_clicked();
-
-    void on_pBtn_Next_clicked();
-
-    void on_pBtn_Pause_clicked();
-
-    void on_pBtn_Loud_clicked();
-
-    void on_pBtn_Low_clicked();
-
-    void on_horizontalSlider_sliderReleased();
-
-    void on_musicPlayer_DurationChanged(qint64);
-    void on_musicPlayer_CurPostionChanged(qint64);
-
-    void on_pBtn_loop_clicked();
-
-    void on_GetSongTrueUrl(QNetworkReply *reply);
-    void on_DownSong(QNetworkReply *reply);
-
-    void on_pushButton_clicked();
-    void on_pBtn_Delete_clicked();
+    QString currentTitle() const;
+    bool isPlaying() const {
+        return player.state() == QMediaPlayer::PlayingState;
+    }
+    int volume() const {
+        return player.volume();
+    }
+    void setVolume(int value) {
+        player.setVolume(qBound(0, value, 100));
+    }
+    void pause() {
+        player.pause();
+    }
+    void play();
 public slots:
-    void on_handleCommand(int);
+    void togglePlayback();
+    void next();
+    void previous();
     void playRandomSong();
+signals:
+    void nowPlayingChanged(QString title, bool playing);
+    void volumeChanged(int volume);
+
 private:
-    void initVolumeHud();
-    void updateVolumeHud(int volume);
-    void changeVolumeByStep(int delta);
-    QString songNameCachePath() const;
-    QString normalizedSongKey(const QString &filePath) const;
-    QString restoreSongDisplayName(const QString &filePath, const QString &fallback) const;
-    void rememberSongDisplayName(const QString &filePath, const QString &displayName);
-    void loadSongNameCache();
-    void saveSongNameCache() const;
-
-    class SearchMusic *searchMusicWin;
-    Ui::MusicPlayer *ui;
-    QMediaPlayer *musicPlayer;
-    QMediaPlaylist *musicPlayList;
-    QWidget *volumeHud;
-    QLabel *volumeValueLabel;
-    QProgressBar *volumeProgressBar;
-    QTimer *volumeHudHideTimer;
-    QHash<QString, QString> songNameCache;
-    QString CurrentSaveSongFileName;
-    QVector<MediaObjectInfo> SongInfoVector;
-
-    QNetworkAccessManager First_netManager;
-    QNetworkRequest First_request;
-    QNetworkAccessManager Second_netManager;
-    QNetworkRequest Second_request;
-
+    void rebuildList();
+    void updateCurrent();
+    void toggleFavorite();
+    QMediaPlayer player;
+    QMediaPlaylist playlist;
+    MediaLibrary library;
+    DownloadService downloads;
+    QVector<MediaTrack> tracks;
+    QStringList favorites;
+    QListWidget *list;
+    QLabel *title, *subtitle, *time, *status;
+    QSlider *seek, *volumeSlider;
+    QPushButton *playButton, *favoriteButton, *filterButton, *modeButton, *scanButton;
+    SearchMusic *search = nullptr;
+    bool restoring = true;
+    qint64 resumePosition = 0;
 };
-
-#endif // MUSICPLAYER_H

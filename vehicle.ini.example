@@ -1,0 +1,27 @@
+; Copy to vehicle.ini beside the executable, or set VEHICLE_CONFIG.
+; Keep real credentials outside version control.
+[paths]
+; Multiple media directories are separated by semicolons.
+music=/run/media/mmcblk0p1/Music
+video=/run/media/mmcblk0p1/Video
+; data=/var/lib/vehicle-terminal
+
+[hardware]
+; Hardware access defaults to true on ARM Linux, false on desktop builds.
+gnss_device=/dev/ttymxc2
+gnss_baud=9600
+camera_device=/dev/video1
+dht_device=/dev/dht11
+key_device=/dev/key
+proximity_path=/sys/class/misc/ap3216c
+
+[map]
+api_key=
+
+[weather]
+app_id=
+app_secret=
+city=惠州
+
+[speech]
+token=

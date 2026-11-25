@@ -1,172 +1,95 @@
 #include "monitor.h"
-#include "ui_monitor.h"
-#include "ap3216.h"
-
-Monitor * Monitor::monitor = nullptr;
-Monitor * Monitor::getInstance()
-{
-    if(monitor==nullptr)
-        monitor = new Monitor();
-    return monitor;
+#include "Ui/uikit.h"
+#include <QHBoxLayout>
+#include <QVBoxLayout>
+Monitor::Monitor(QWidget *parent) : QMainWindow(parent), capture(this), sensor(this) {
+    setObjectName("page");
+    auto *page = new QWidget;
+    auto *root = new QVBoxLayout(page);
+    root->setContentsMargins(8, 4, 8, 8);
+    setCentralWidget(page);
+    auto *top = new QHBoxLayout;
+    top->addWidget(UiKit::label(QStringLiteral("摄像头影像"), "title"));
+    top->addStretch();
+    fps = UiKit::label("-- FPS", "muted");
+    toggle = UiKit::button(QStringLiteral("启动影像"), "camera");
+    top->addWidget(fps);
+    top->addWidget(toggle);
+    root->addLayout(top);
+    auto *card = UiKit::card();
+    auto *layout = new QVBoxLayout(card);
+    image = UiKit::label(QStringLiteral("影像未开启"));
+    image->setAlignment(Qt::AlignCenter);
+    image->setMinimumSize(320, 220);
+    layout->addWidget(image, 1);
+    root->addWidget(card, 1);
+    auto *bottom = new QHBoxLayout;
+    status = UiKit::label(QStringLiteral("等待摄像头"), "muted");
+    status->setWordWrap(true);
+    proximity = UiKit::label(QStringLiteral("接近度 --"), "muted");
+    bottom->addWidget(status, 1);
+    bottom->addWidget(proximity);
+    root->addLayout(bottom);
+    connect(toggle, &QPushButton::clicked, this, [this]() {
+        if (wanted)
+            myStop();
+        else
+            myStart();
+    });
+    connect(&capture, &CaptureThread::imageReady, this, [this](QImage frame) {
+        if (wanted) {
+            image->setPixmap(QPixmap::fromImage(frame).scaled(image->size(), Qt::KeepAspectRatio,
+                                                              Qt::FastTransformation));
+            status->setText(QStringLiteral("实时影像"));
+            ++frames;
+            if (fpsTimer.elapsed() >= 1000) {
+                fps->setText(
+                    QString("%1 FPS").arg(frames * 1000.0 / fpsTimer.elapsed(), 0, 'f', 1));
+                frames = 0;
+                fpsTimer.restart();
+            }
+        }
+        capture.acknowledgeFrame();
+    });
+    connect(&capture, &CaptureThread::captureError, this, [this](QString error) {
+        wanted = false;
+        timer.stop();
+        image->clear();
+        image->setText(error);
+        status->setText(error);
+        toggle->setText(QStringLiteral("重试连接"));
+    });
+    connect(&capture, &QThread::finished, this, [this]() {
+        if (wanted)
+            capture.startThread();
+    });
+    timer.setInterval(1000);
+    connect(&timer, &QTimer::timeout, this, [this]() {
+        const QString value = sensor.readPsData();
+        proximity->setText(value.isEmpty() ? QStringLiteral("接近度传感器不可用")
+                                           : QStringLiteral("接近度原始值 %1").arg(value));
+    });
 }
-
-Monitor::Monitor(QWidget *parent) :
-    QMainWindow(parent),
-    ui(new Ui::Monitor)
-{
-    this->setGeometry(0, 0, 1024, 600);
-
-    ap3216 = new Ap3216c();
-
-    videoLabel = new QLabel(this);
-    videoLabel->setText("未获取到图像数据");
-    videoLabel->setStyleSheet("QWidget {color: white;}");
-    videoLabel->setAlignment(Qt::AlignCenter);
-    videoLabel->resize(1024, 600);
-    DisUpdate_Timer = new QTimer(this);
-    DisUpdate_Timer->setInterval(500);
-    DisUpdate_Timer->start();
-//    checkBox1 = new QCheckBox(this);
-//    checkBox2 = new QCheckBox(this);
-
-//    checkBox1->resize(120, 50);
-//    checkBox2->resize(120, 50);
-
-//    checkBox1->setText("本地显示");
-//    checkBox2->setText("开启广播");
-
-//    checkBox1->setStyleSheet("QCheckBox {color: yellow;}"
-//                             "QCheckBox:indicator {width: 40; height: 40;}");
-//    checkBox2->setStyleSheet("QCheckBox {color: yellow;}"
-//                             "QCheckBox:indicator {width: 40; height: 40}");
-    showDistance = new QLabel(this);
-    showDistance->resize(120,50);
-    showDistance->setStyleSheet("QLabel{color:blue;}"
-                                "QLabel{background:argb(255,255,255,50)}"
-                                );
-    showDistance->setAlignment(Qt::AlignCenter);
-    QFont font("宋体",12);
-    font.setBold(true);
-    showDistance->setFont(font);
-    showDistance->setText("距离:xxxx");
-
-    fpsLabel = new QLabel(this);
-    fpsLabel->setAlignment(Qt::AlignCenter);
-    fpsLabel->setStyleSheet("QLabel{color:white;}"
-                            "QLabel{background:argb(255,0,0,120);}"
-                            "QLabel{border-radius:8px;}");
-    fpsLabel->setFont(font);
-    fpsLabel->setText("FPS: 0.0");
-    /* 按钮 */
-    startCaptureButton = new QPushButton(this);
-    startCaptureButton->setCheckable(true);
-    startCaptureButton->setText("返回");
-
-    /* 设置背景颜色为黑色 */
-    QColor color = QColor(Qt::black);
-    QPalette p;
-    p.setColor(QPalette::Window, color);
-    this->setPalette(p);
-
-    /* 样式表 */
-    startCaptureButton->setStyleSheet("QPushButton {background-color: white; border-radius: 30}"
-                                      "QPushButton:pressed  {background-color: red;}");
-
-    captureThread = new CaptureThread(this);
-    captureThread->setLocalDisplay(true);
-    //connect(startCaptureButton, SIGNAL(clicked(bool)), captureThread, SLOT(setThreadStart(bool)));
-    connect(startCaptureButton, SIGNAL(clicked(bool)), this, SLOT(startCaptureButtonClicked(bool)));
-    connect(captureThread, SIGNAL(imageReady(QImage)), this, SLOT(showImage(QImage)));
-//    connect(checkBox1, SIGNAL(clicked(bool)), captureThread, SLOT(setLocalDisplay(bool)));
-//    connect(checkBox2, SIGNAL(clicked(bool)), captureThread, SLOT(setBroadcast(bool)));
-    connect(DisUpdate_Timer,SIGNAL(timeout()),this,SLOT(on_timer_timeout()));
-    DisUpdate_Timer->setInterval(500);
-}
-
-Monitor::~Monitor()
-{
-    delete ui;
-}
-
-
-void Monitor::showImage(QImage image)
-{
-    videoLabel->setPixmap(QPixmap::fromImage(image));
-
-    if (!fpsTimer.isValid()) {
-        fpsTimer.start();
-        fpsFrameCount = 0;
-    }
-
-    ++fpsFrameCount;
-    const qint64 elapsedMs = fpsTimer.elapsed();
-    if (elapsedMs >= 1000) {
-        currentFps = (fpsFrameCount * 1000.0) / elapsedMs;
-        fpsLabel->setText(QString("FPS: %1").arg(currentFps, 0, 'f', 1));
-        fpsFrameCount = 0;
-        fpsTimer.restart();
-    }
-}
-
-void Monitor::resizeEvent(QResizeEvent *event)
-{
-    Q_UNUSED(event)
-    startCaptureButton->move((this->width() - 200) / 2, this->height() - 80);
-    startCaptureButton->resize(200, 40);
-    showDistance->resize(200,60);
-    showDistance->move((this->width() - 200) / 2, this->height() - 140);
-    fpsLabel->resize(140, 42);
-    fpsLabel->move(this->width() - fpsLabel->width() - 16, 16);
-   // videoLabel->move((this->width() - 640) / 2, (this->height() - 480) / 2);
-//    checkBox1->move(this->width() - 120, this->height() / 2 - 50);
-    //    checkBox2->move(this->width() - 120, this->height() / 2 + 25);
-}
-
-void Monitor::myStart()
-{
-    DisUpdate_Timer->start();
-    fpsFrameCount = 0;
-    currentFps = 0.0;
-    fpsLabel->setText("FPS: 0.0");
-    fpsTimer.invalidate();
-    captureThread->startThread();
-}
-
-void Monitor::myStop()
-{
-    DisUpdate_Timer->stop();
-    fpsTimer.invalidate();
-    captureThread->stopThread();
-}
-
-void Monitor::startCaptureButtonClicked(bool start)
-{
-    Q_UNUSED(start);
+Monitor::~Monitor() {
     myStop();
-    this->hide();
+    capture.wait();
 }
-
-void Monitor::on_timer_timeout()
-{
-    //qDebug()<<"updateDistance ";
-    QString str = QString("距离: %1").arg(ap3216->readPsData());
-    this->showDistance->setText(str);
+void Monitor::myStart() {
+    if (wanted)
+        return;
+    wanted = true;
+    frames = 0;
+    fpsTimer.start();
+    status->setText(QStringLiteral("正在连接摄像头…"));
+    toggle->setText(QStringLiteral("停止影像"));
+    timer.start();
+    capture.startThread();
 }
-
-void Monitor::on_handleCommand(int command)
-{
-    switch (command) {
-    case MONITOR_COMMAND_SHOW:
-        this->show();
-        this->raise();
-        this->activateWindow();
-        myStart();
-        break;
-    case MONITOR_COMMAND_CLOSE:
-        myStop();
-        this->hide();
-        break;
-    default:
-        break;
-    }
+void Monitor::myStop() {
+    wanted = false;
+    timer.stop();
+    capture.stopThread();
+    fps->setText("-- FPS");
+    status->setText(QStringLiteral("影像已暂停"));
+    toggle->setText(QStringLiteral("启动影像"));
 }

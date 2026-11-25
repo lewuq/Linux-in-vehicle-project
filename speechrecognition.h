@@ -1,61 +1,22 @@
-#ifndef SPEECHRECOGNITION_H
-#define SPEECHRECOGNITION_H
-
-#include <QObject>
-#include <QThread>
+#pragma once
 #include <QAudioRecorder>
-#include <QAudioProbe>
-#include <QNetworkReply>
-#include <QNetworkRequest>
-#include <QNetworkAccessManager>
-#include <QDate>
-#include <QTime>
-#include <QUrl>
-#include <QFile>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <signal.h>
+#include <QObject>
 #include <QTimer>
-class SpeechRecognition : public QObject
-{
+class SpeechRecognition : public QObject {
     Q_OBJECT
 public:
-    SpeechRecognition();
-
-    // QThread interface
-private:
-    void initAudioRecord();
-    void initKeyRead();
-    int readKeyValue();
-    void initAsyncHandle();
-signals:
-    void MessageFromAsrThread(QString str);
-    void RecordFinished();
-private slots:
-    void timer_timerout();
-    void onRecorderStateChanged(QMediaRecorder::State state);
-    static void getSpeechResult(QNetworkReply *reply);
-
-private:
-    QAudioRecorder *m_audioRecorder = nullptr;
-    QTimer *timer;
-    int hasRecord = 0;
-    QList<QVariant>devicesVar;
-    QList<QVariant>codecsVar;
-    QList<QVariant>containersVar;
-    QList<QVariant>sampleRateVar;
-    QList<QVariant>channelsVar;
-    QList<QVariant>qualityVar;
-    QList<QVariant>bitratesVar;
-    qint64 recordStartMs = 0;
-    bool pendingRecordFinished = false;
-public:
-    int key_fd;
-    void startSpeechRecognition();
+    explicit SpeechRecognition(QObject *parent = nullptr);
+    ~SpeechRecognition() override;
     void startRecord();
     void stopRecord();
-};
+signals:
+    void RecordFinished();
+    void status(QString text);
 
-static SpeechRecognition *SR;
-#endif // SPEECHRECOGNITION_H
+private:
+    void readKey();
+    QAudioRecorder recorder;
+    QTimer keyTimer;
+    int keyFd = -1;
+    bool keyPressed = false, pending = false;
+};

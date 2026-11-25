@@ -1,23 +1,17 @@
-#ifndef DHT11_H
-#define DHT11_H
-
-#include <QObject>
+#pragma once
 #include <QThread>
-#include <QFile>
-#include <QDebug>
-class Dht11 : public QThread
-{
-
+class Dht11 : public QThread {
     Q_OBJECT
-
 public:
-    Dht11();
-protected:
-    void run();
+    explicit Dht11(QObject *parent = nullptr) : QThread(parent) {}
+    ~Dht11() override {
+        requestInterruption();
+        wait();
+    }
 signals:
-    void updateDht11Data(QString humi,QString temp);
-private:
-    QFile file;
-};
+    void updateDht11Data(QString humidity, QString temperature);
+    void unavailable(QString reason);
 
-#endif // DHT11_H
+protected:
+    void run() override;
+};

@@ -1,100 +1,34 @@
-/******************************************************************
-Copyright © Deng Zhimao Co., Ltd. 2021-2030. All rights reserved.
-* @projectName   video_server
-* @brief         capture_thread.h
-* @author        Deng Zhimao
-* @email         dengzhimao@alientek.com
-* @link          www.openedv.com
-* @date          2021-11-19
-*******************************************************************/
-#ifndef CAPTURE_THREAD_H
-#define CAPTURE_THREAD_H
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <pthread.h>
-
-#ifdef linux
-#include <linux/fb.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <linux/videodev2.h>
-#include <linux/input.h>
-#endif
-
-#include <QThread>
-#include <QDebug>
-#include <QPushButton>
+/* V4L2 capture adapted from Deng Zhimao / ALIENTEK, 2021.
+ * Original copyright notices are retained in THIRD_PARTY_NOTICES.md. */
+#pragma once
 #include <QImage>
-#include <QByteArray>
-#include <QBuffer>
-#include <QTime>
-#include <QUdpSocket>
+#include <QThread>
 #include <atomic>
-
-#define VIDEO_DEV			"/dev/video1"
-#define FB_DEV				"/dev/fb0"
-#define VIDEO_BUFFER_COUNT	3
-
-struct buffer_info {
-    void *start;
-    unsigned int length;
-};
-
-class CaptureThread : public QThread
-{
+class CaptureThread : public QThread {
     Q_OBJECT
-
+public:
+    explicit CaptureThread(QObject *parent = nullptr) : QThread(parent) {}
+    ~CaptureThread() override {
+        requestInterruption();
+        wait();
+    }
+    void startThread() {
+        if (!isRunning())
+            start();
+    }
+    void stopThread() {
+        requestInterruption();
+    }
+    void acknowledgeFrame() {
+        framePending = false;
+    }
 signals:
-    /* 准备图片 */
-    void imageReady(QImage);
-    void sendImage(QImage);
+    void imageReady(QImage image);
+    void captureError(QString message);
 
-private:
-    /* 线程开启flag */
-    std::atomic<bool> startFlag{false};
-
-    /* 本地显示flag  */
-    std::atomic<bool> startLocalDisplay{false};
+protected:
     void run() override;
 
-public:
-    CaptureThread(QObject *parent = nullptr) {
-        Q_UNUSED(parent);
-    }
-public :
-    void startThread()
-    {
-        startFlag = true;
-        if (!this->isRunning())
-            this->start();
-    }
-    void stopThread()
-    {
-        startFlag = false;
-        this->quit();
-    }
-
-public slots:
-    /* 设置线程 */
-    void setThreadStart(bool start) {
-        startFlag = start;
-        if (start) {
-            if (!this->isRunning())
-                this->start();
-        } else {
-            this->quit();
-        }
-    }
-
-    /* 设置本地显示 */
-    void setLocalDisplay(bool start) {
-        startLocalDisplay = start;
-    }
+private:
+    std::atomic<bool> framePending{false};
 };
-
-#endif // CAPTURE_THREAD_H

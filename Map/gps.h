@@ -1,27 +1,19 @@
-#ifndef GPS_H
-#define GPS_H
-
+#ifndef VEHICLE_GPS_H
+#define VEHICLE_GPS_H
 #ifdef __cplusplus
-extern "C"{
+extern "C" {
 #endif
-
-
-
-static char dataBuf[100];
-static int OneFramFlag;
-static int OneFramStart = 0;
-static int saveData_location=0;
-static int gps_fd;
-static char* gps_device = "/dev/ttymxc2";
-
-static int gps_valid=0;
-
-int gps_init();
-//int set_gps_async_update();
-int analyseRawData();
-int getGpsData(char* N_S_Flag,char *E_W_Flag,double *jingdu,double *weidu);
+typedef struct {
+    double latitude;
+    double longitude;
+    int satellites;
+    int valid;
+} GpsFix;
+int gps_parse_sentence(const char *sentence, GpsFix *fix);
+int gps_start(const char *device, unsigned int baud);
+void gps_stop(void);
+int gps_snapshot(GpsFix *fix);
 #ifdef __cplusplus
 }
 #endif
-
 #endif

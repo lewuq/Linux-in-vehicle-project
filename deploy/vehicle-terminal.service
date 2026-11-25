@@ -1,0 +1,14 @@
+[Unit]
+Description=i.MX6ULL Vehicle Terminal
+After=network.target connman.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/vehicle-terminal
+EnvironmentFile=-/etc/vehicle-terminal.env
+ExecStart=/bin/sh /opt/vehicle-terminal/scripts/run.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

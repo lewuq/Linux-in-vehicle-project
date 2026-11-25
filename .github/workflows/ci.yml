@@ -1,0 +1,22 @@
+name: Qt build and tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  linux-qt5:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt 5 dependencies
+        run: sudo apt-get update && sudo apt-get install -y qtbase5-dev qtmultimedia5-dev qt5-qmake
+      - name: Build application
+        run: mkdir build && cd build && qmake ../VehicleTerminal.pro && make -j2
+      - name: Build tests
+        run: mkdir build-tests && cd build-tests && qmake ../tests/tests.pro && make -j2
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+          VEHICLE_HARDWARE_ENABLED: "false"
+        run: cd build-tests && ./vehicle-tests

@@ -1,246 +1,220 @@
-#define _GNU_SOURCE
+#define _DEFAULT_SOURCE
 #include "gps.h"
-#include "uart.h"
+#include <ctype.h>
+#include <math.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <linux/types.h>
-#include <sys/types.h>
-#include <stdio.h>
 #include <string.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
+static int coordinate(const char *text, const char *hemisphere, int latitude, double *out) {
+    char *end;
+    double raw = strtod(text, &end), degrees = floor(raw / 100.0), minutes = raw - degrees * 100.0;
+    double limit = latitude ? 90.0 : 180.0;
+    if (!*text || *end || !isfinite(raw) || raw < 0 || minutes >= 60 || degrees > limit ||
+        (degrees == limit && minutes != 0) || strlen(hemisphere) != 1)
+        return 0;
+    if (latitude ? (*hemisphere != 'N' && *hemisphere != 'S')
+                 : (*hemisphere != 'E' && *hemisphere != 'W'))
+        return 0;
+    *out = degrees + minutes / 60.0;
+    if (*hemisphere == 'S' || *hemisphere == 'W')
+        *out = -*out;
+    return 1;
+}
+int gps_parse_sentence(const char *sentence, GpsFix *fix) {
+    char line[128], *fields[24], *cursor, *star;
+    unsigned int checksum = 0;
+    size_t length, count = 0, i;
+    GpsFix parsed = {0};
+    if (!sentence || !fix || sentence[0] != '$')
+        return 0;
+    length = strlen(sentence);
+    if (length >= sizeof(line))
+        return 0;
+    memcpy(line, sentence, length + 1);
+    star = strchr(line, '*');
+    if (!star || strlen(star + 1) < 2 || !isxdigit((unsigned char)star[1]) ||
+        !isxdigit((unsigned char)star[2]))
+        return 0;
+    for (cursor = line + 1; cursor < star; ++cursor)
+        checksum ^= (unsigned char)*cursor;
+    {
+        char hex[3] = {star[1], star[2], 0};
+        if (checksum != strtoul(hex, NULL, 16))
+            return 0;
+    }
+    for (cursor = star + 3; *cursor; ++cursor)
+        if (*cursor != '\r' && *cursor != '\n')
+            return 0;
+    *star = 0;
+    fields[count++] = line + 1;
+    for (cursor = line + 1; *cursor; ++cursor)
+        if (*cursor == ',') {
+            if (count >= sizeof(fields) / sizeof(fields[0]))
+                return 0;
+            *cursor = 0;
+            fields[count++] = cursor + 1;
+        }
+    if (strlen(fields[0]) != 5)
+        return 0;
+    i = 2;
+    if (strcmp(fields[0] + 2, "GGA") == 0) {
+        if (count < 8)
+            return 0;
+        parsed.valid = atoi(fields[6]) > 0;
+        parsed.satellites = atoi(fields[7]);
+    } else if (strcmp(fields[0] + 2, "RMC") == 0) {
+        if (count < 7)
+            return 0;
+        parsed.valid = strcmp(fields[2], "A") == 0;
+        i = 3;
+    } else
+        return 0;
+    if (parsed.valid && (!coordinate(fields[i], fields[i + 1], 1, &parsed.latitude) ||
+                         !coordinate(fields[i + 2], fields[i + 3], 0, &parsed.longitude)))
+        return 0;
+    *fix = parsed;
+    return 1;
+}
+#ifdef __linux__
 #include <fcntl.h>
-#include <termios.h>
+#include <poll.h>
 #include <pthread.h>
-
-pthread_rwlock_t gps_rwlock;
-static char N_S_Flag = 'N';
-static char E_W_Flag = 'E';
-static double jingdu = 113.3800;
-static double weidu = 34.3500;
-
-pthread_t threat_id;
-
-int gps_init()
-{
-#if __arm__
-    uart_cfg_t cfg = {0};
-    gps_valid = 0;
-    pthread_rwlock_init(&gps_rwlock,NULL);
-    cfg.parity='N';
-    cfg.dbit=8;
-    cfg.sbit=1;
-    cfg.baudrate=9600;
-    gps_fd = uart_init(gps_device);
-    if (0>gps_fd)
-    {
-        printf("uart init error \n");
-        return -1;
-    }
-    if (uart_cfg(&cfg,gps_fd)) {
-        close(gps_fd);
-        printf("uart cfg error \n");
-        return -1;
-    }
-#endif
-    saveData_location =0;
-    OneFramStart = 0;
-    create_gps_thread();
-    //set_gps_async_update();
-}
-
-/*  被分析原始数据 函数调用，用于获取下一个逗号的位置  */
-int get_pos_dot(unsigned char *buf, unsigned char uc_cnt )
-{
-    unsigned char *buf_x;
-    buf_x = buf;
-    while(uc_cnt)
-    {
-        if(*buf_x==',')
-            uc_cnt--;
-
-        buf_x++;
-    }
-    return buf_x-buf;
-}
-/*  被外界访问 获取经纬度数据  */
-int getGpsData(char *N_S_Flag_p,char *E_W_Flag_p,double *jingdu_p,double *weidu_p)
-{
-    pthread_rwlock_rdlock(&gps_rwlock);
-    *N_S_Flag_p = N_S_Flag;
-    *E_W_Flag_p = E_W_Flag;
-    *jingdu_p = jingdu;
-    *weidu_p = weidu;
-    pthread_rwlock_unlock(&gps_rwlock);
-}
-
-/*  被回调函数调用 ，用于分析原始数据，得到经纬度数据 */
-int analyseRawData()
-{
-    char N_S_Flag_local;
-    char E_W_Flag_local;
-    double jingdu_local;
-    double weidu_local;
-    unsigned char uc_pos_x = 0;
-    uc_pos_x = get_pos_dot(dataBuf,3);
-    char num_buf[10];
-    if(17>=uc_pos_x)
-    {
-        gps_valid = 0;
-        return -1;
-    }
-    uc_pos_x = get_pos_dot(dataBuf,2);
-    memcpy(num_buf,&dataBuf[uc_pos_x],9);
-    num_buf[9]='\0';
-    weidu_local = strtod(num_buf,NULL);
-    weidu_local/=100;
-    uc_pos_x = get_pos_dot(dataBuf,3);
-    N_S_Flag_local = dataBuf[uc_pos_x];
-    uc_pos_x = get_pos_dot(dataBuf,4);
-    memcpy(num_buf,&dataBuf[uc_pos_x],9);
-    num_buf[9]='\0';
-    jingdu_local = strtod(num_buf,NULL);
-    jingdu_local/=100;
-    uc_pos_x = get_pos_dot(dataBuf,5);
-    E_W_Flag_local = dataBuf[uc_pos_x];
-
-    pthread_rwlock_wrlock(&gps_rwlock);
-    N_S_Flag = N_S_Flag_local;
-    E_W_Flag = E_W_Flag_local;
-    jingdu = jingdu_local;
-    weidu = weidu_local;
-    gps_valid  = 1;
-    pthread_rwlock_unlock(&gps_rwlock);
-    return 0;
-}
-
-/*   线程回调函数  ，不断刷新获取GPS数据  */
-static void * gps_thread_func(void* param)
-{
-    char c;
-    while(1)
-    {
-
-#if __arm__
-        read(gps_fd, &c, 1); // 从 串口读取数据获取原始数据
-        if(1==OneFramStart)
-        {
-            if(0x0a==c)
-            {
-                OneFramStart = 0;
-                dataBuf[saveData_location++]='\0';
-                if('G' == dataBuf[3])
-                {
-                    analyseRawData();
+#include <termios.h>
+#include <time.h>
+#include <unistd.h>
+static pthread_t worker;
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static int running, started, serial_fd = -1;
+static GpsFix latest;
+static struct timespec received_at;
+static void *collect(void *unused) {
+    char line[128];
+    size_t used = 0;
+    (void)unused;
+    for (;;) {
+        struct pollfd descriptor = {serial_fd, POLLIN, 0};
+        char bytes[256];
+        ssize_t n, j;
+        int keep_running;
+        pthread_mutex_lock(&lock);
+        keep_running = running;
+        pthread_mutex_unlock(&lock);
+        if (!keep_running)
+            break;
+        if (poll(&descriptor, 1, 200) <= 0)
+            continue;
+        if (descriptor.revents & (POLLERR | POLLHUP | POLLNVAL))
+            break;
+        n = read(serial_fd, bytes, sizeof(bytes));
+        for (j = 0; j < n; ++j) {
+            char c = bytes[j];
+            if (c == '$') {
+                used = 0;
+                line[used++] = c;
+            } else if (used && c == '\n') {
+                GpsFix fix;
+                line[used] = 0;
+                if (gps_parse_sentence(line, &fix)) {
+                    pthread_mutex_lock(&lock);
+                    if (!fix.satellites && fix.valid)
+                        fix.satellites = latest.satellites;
+                    latest = fix;
+                    clock_gettime(CLOCK_MONOTONIC, &received_at);
+                    pthread_mutex_unlock(&lock);
                 }
-            }
+                used = 0;
+            } else if (used && used < sizeof(line) - 1)
+                line[used++] = c;
             else
-            {
-                dataBuf[saveData_location]=c;
-                saveData_location++;
-            }
+                used = 0;
         }
-        else if('$'==c)
-        {
-            OneFramStart = 1;
-            memset(dataBuf, 0, sizeof(dataBuf));
-            saveData_location = 0;
-            return ;
-        }
-#else
-        gps_valid = 0;
-#endif
-        usleep(500000);
     }
+    pthread_mutex_lock(&lock);
+    latest.valid = 0;
+    pthread_mutex_unlock(&lock);
+    return NULL;
 }
-
-
-/*  创建一个线程，实时更新GPS数据 **/
-int create_gps_thread()
-{
-    int err;
-    err = pthread_create(&threat_id,NULL,gps_thread_func,NULL);
-    if(err!=0)
-    {
-        printf("Can't create gps thread\n");
+int gps_start(const char *device, unsigned int baud) {
+    struct termios options;
+    speed_t speed;
+    if (started)
+        return 0;
+    switch (baud) {
+    case 9600:
+        speed = B9600;
+        break;
+    case 38400:
+        speed = B38400;
+        break;
+    case 115200:
+        speed = B115200;
+        break;
+    default:
         return -1;
     }
+    serial_fd = open(device, O_RDONLY | O_NOCTTY | O_NONBLOCK);
+    if (serial_fd < 0)
+        return -1;
+    if (tcgetattr(serial_fd, &options) != 0) {
+        close(serial_fd);
+        serial_fd = -1;
+        return -1;
+    }
+    cfmakeraw(&options);
+    cfsetispeed(&options, speed);
+    cfsetospeed(&options, speed);
+    options.c_cflag |= CLOCAL | CREAD;
+    if (tcsetattr(serial_fd, TCSANOW, &options) != 0) {
+        close(serial_fd);
+        serial_fd = -1;
+        return -1;
+    }
+    running = 1;
+    if (pthread_create(&worker, NULL, collect, NULL) != 0) {
+        running = 0;
+        close(serial_fd);
+        serial_fd = -1;
+        return -1;
+    }
+    started = 1;
     return 0;
 }
-
-
-//static void read_data_handle(int sig,siginfo_t *info, void *context)
-//{
-//    char c;
-//    int ret;
-//    if(SIGRTMIN != sig)
-//        return;
-//    if (POLL_IN == info->si_code) {
-//        ret = read(gps_fd, &c, 1);
-//        if(1==OneFramStart)
-//        {
-//            if(0x0a==c)
-//            {
-//                OneFramStart = 0;
-//                dataBuf[saveData_location++]='\0';
-//                //printf("Read One Frame:%s\n",dataBuf);
-//                goto handle_one_frame_data;
-//            }
-//            dataBuf[saveData_location]=c;
-//            saveData_location++;
-//            return ;
-//        }
-//        if('$'==c)
-//        {
-//            OneFramStart = 1;
-//            memset(dataBuf, 0, sizeof(dataBuf));
-//            saveData_location = 0;
-//            return ;
-//        }
-//    }
-//handle_one_frame_data:
-//    if('G' == dataBuf[3])
-//    {
-//        analyseRawData();
-//        return ;
-//    }
-//}
-
-
-//int set_gps_async_update()
-//{
-//    struct sigaction sigatn;
-//    int flag;
-
-
-//    flag = fcntl(gps_fd, F_GETFL);
-//    flag |= O_ASYNC;
-//    fcntl(gps_fd, F_SETFL, flag);
-
-
-//    fcntl(gps_fd, F_SETOWN, getpid());
-
-
-//    fcntl(gps_fd, F_SETSIG, SIGRTMIN);
-
-
-//    sigatn.sa_sigaction = read_data_handle;
-//    sigatn.sa_flags = SA_SIGINFO;
-//    sigemptyset(&sigatn.sa_mask);
-//    sigaction(SIGRTMIN, &sigatn, NULL);
-//}
-
-//int main()
-//{
-//	gps_init();
-//	while(1)
-//	{
-//		printf("********************************\n");
-//		printf("%c-%4.4f | %c-%4.4f\n",N_S_Flag,weidu,E_W_Flag,jingdu);
-//		printf("********************************\n");
-//		usleep(1000000);
-//	}
-//}
-
+void gps_stop(void) {
+    if (!started)
+        return;
+    pthread_mutex_lock(&lock);
+    running = 0;
+    pthread_mutex_unlock(&lock);
+    pthread_join(worker, NULL);
+    close(serial_fd);
+    serial_fd = -1;
+    started = 0;
+    pthread_mutex_lock(&lock);
+    memset(&latest, 0, sizeof(latest));
+    memset(&received_at, 0, sizeof(received_at));
+    pthread_mutex_unlock(&lock);
+}
+int gps_snapshot(GpsFix *fix) {
+    if (!fix)
+        return 0;
+    pthread_mutex_lock(&lock);
+    *fix = latest;
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    if (now.tv_sec - received_at.tv_sec > 5)
+        fix->valid = 0;
+    pthread_mutex_unlock(&lock);
+    return fix->valid;
+}
+#else
+int gps_start(const char *device, unsigned int baud) {
+    (void)device;
+    (void)baud;
+    return -1;
+}
+void gps_stop(void) {}
+int gps_snapshot(GpsFix *fix) {
+    if (fix)
+        memset(fix, 0, sizeof(*fix));
+    return 0;
+}
+#endif

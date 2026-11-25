@@ -1,81 +1,57 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
-
+#pragma once
+#include <QElapsedTimer>
 #include <QMainWindow>
-#include <QVBoxLayout>
-#include <QParallelAnimationGroup>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include "settingwindow.h"
-#include "clock.h"
-#include "dht11.h"
-#include "Map/baidumap.h"
-#include "Music/musicplayer.h"
-#include "Weather/weather.h"
-#include "Monitor/monitor.h"
-#include "speechrecognition.h"
-#include "onevideo.h"
 #include <QTimer>
-#include <QPushButton>
-QT_BEGIN_NAMESPACE
-namespace Ui { class MainWindow; }
-QT_END_NAMESPACE
-
-class MainWindow : public QMainWindow
-{
+#include <QVector>
+class QStackedWidget;
+class QPushButton;
+class QLabel;
+class QSlider;
+class MusicPlayer;
+class OneVideo;
+class Monitor;
+class BaiduMap;
+class Weather;
+class SettingWindow;
+class GnssService;
+class WeatherService;
+class SpeechService;
+class Dht11;
+enum class VoiceCommand;
+class MainWindow : public QMainWindow {
     Q_OBJECT
-
 public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
-signals:
-    void SendCommandToMusic(int);
-    void SendCommandToMap(int);
-    void SendCommandToMonitor(int);
-private slots:
-    void on_pBtn_Setting_clicked();
-    void on_update_humidity_temp(QString, QString);
-    void getSpeechResult(QNetworkReply *reply);
-
-    void on_pBtn_Music_clicked();
-    void on_pBtn_Video_clicked();
-    void on_timeSyncReply(QNetworkReply *reply);
-
-    void on_pBtn_Weather_clicked();
-
-    void on_pBtn_Monitor_clicked();
-
-    void on_pBtn_Map_clicked();
-    void on_timer_updateTime();
-    void on_quickSetTime_clicked();
-    void on_networkTimeSync_clicked();
-
-    void on_handleRecord();
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
+    void openPage(int index);
+    void capturePages(const QString &directory);
 
 private:
-    Ui::MainWindow *ui;
-    Clock clock;
-    OneVideo oneVideo;
-    SettingWindow settingWindow;
-    bool eventFilter(QObject *watched, QEvent *event);
-    QParallelAnimationGroup *myAnimationGroup;
-    Dht11 *dht11;
-
-    // QObject interface
-    Monitor *monitor;
-    Weather *weather;
-    MusicPlayer *musicPlayer;
-    BaiduMap *baiduMap;
-    QTimer *time;
-    SpeechRecognition *AsrThread;
-    QNetworkAccessManager *networkManage;
-    QNetworkAccessManager *timeSyncManager = nullptr;
-    QNetworkRequest *request;
-    QVector<QMainWindow *> windows;
-    QPushButton *quickSetTimeBtn = nullptr;
-    QPushButton *networkSyncBtn = nullptr;
-
-    void syncBeijingTime();
-
+    QWidget *createHome();
+    QWidget *ensurePage(int index);
+    MusicPlayer *ensureMusic();
+    void updateClock();
+    void updateStatus();
+    void handleVoice(VoiceCommand command);
+    void updateWeather();
+    QStackedWidget *stack;
+    QVector<QWidget *> pages;
+    QVector<QPushButton *> navigation;
+    QLabel *pageTitle, *clockLabel, *dateLabel, *networkLabel, *positionLabel, *weatherLabel,
+        *weatherDetail, *weatherImage, *temperatureLabel, *humidityLabel, *sensorLabel, *songLabel,
+        *footerSong, *sessionLabel, *voiceLabel;
+    QPushButton *homePlay, *footerPlay;
+    QSlider *volumeSlider;
+    MusicPlayer *music = nullptr;
+    OneVideo *video = nullptr;
+    Monitor *camera = nullptr;
+    BaiduMap *map = nullptr;
+    SettingWindow *settings = nullptr;
+    GnssService *gnss;
+    WeatherService *weather;
+    SpeechService *speech;
+    Dht11 *sensor;
+    QElapsedTimer session;
+    QTimer ticker;
+    int currentPage = 0;
 };
-#endif // MAINWINDOW_H
